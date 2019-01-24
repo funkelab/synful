@@ -1,0 +1,2 @@
+from __future__ import absolute_import
+from .add_partner_vector_map import AddPartnerVectorMap
