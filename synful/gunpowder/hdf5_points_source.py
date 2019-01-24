@@ -1,15 +1,14 @@
 import copy
 import logging
-import numpy as np
 
+import numpy as np
 from gunpowder.batch import Batch
+from gunpowder.contrib.points import PreSynPoint, PostSynPoint
 from gunpowder.coordinate import Coordinate
 from gunpowder.ext import h5py
+from gunpowder.nodes.batch_provider import BatchProvider
 from gunpowder.points import PointsKeys, Points
 from gunpowder.points_spec import PointsSpec
-from gunpowder.nodes.batch_provider import BatchProvider
-
-from gunpowder.contrib.points import PreSynPoint, PostSynPoint
 
 logger = logging.getLogger(__name__)
 
