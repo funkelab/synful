@@ -1,2 +1,3 @@
 from __future__ import absolute_import
 from .add_partner_vector_map import AddPartnerVectorMap
+from .hdf5_points_source import Hdf5PointsSource
