@@ -9,6 +9,8 @@ from gunpowder.ext import h5py
 from gunpowder.nodes.batch_provider import BatchProvider
 from gunpowder.points import PointsKeys, Points
 from gunpowder.points_spec import PointsSpec
+from gunpowder.profiling import Timing
+
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,9 @@ class Hdf5PointsSource(BatchProvider):
 
     def provide(self, request):
 
+        timing_process = Timing(self)
+        timing_process.start()
+
         batch = Batch()
 
         with h5py.File(self.filename, 'r') as hdf_file:
@@ -87,6 +92,9 @@ class Hdf5PointsSource(BatchProvider):
                 points_spec = self.spec[points_key].copy()
                 points_spec.roi = request_spec.roi
                 batch.points[points_key] = Points(data=id_to_point, spec=points_spec)
+
+        timing_process.stop()
+        batch.profiling_stats.add(timing_process)
 
         return batch
 
