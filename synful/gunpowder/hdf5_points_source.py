@@ -29,19 +29,37 @@ class Hdf5PointsSource(BatchProvider):
         rois (dict): Dictionary of :class:``PointsKey`` -> :class:``Roi`` to
             set the ROI for each point set provided by this source.
 
+        kind (string): allowed arguments are synapse, presyn, postsyn. If
+            synaptic partners should be loaded, choose: synapse -->
+            provide two pointskeys: PRESYN and POSTSYN. If only pre or postsyn
+            should be loaded, without the respective partner, choose presyn or
+            postsyn --> only provide one pointkey.
+
     '''
 
     def __init__(
             self,
             filename,
             datasets,
-            rois=None):
+            rois=None,
+            kind='synapse'):
 
         self.filename = filename
         self.datasets = datasets
         self.rois = rois
-
+        self.kind = kind # partner, presyn or postsyn
         self.ndims = None
+        assert kind == 'synapse' or kind == 'presyn' or kind == 'postsyn',\
+            "option -kind- set to {}, Hdf5PointsSource implemented only " \
+            "for synapse, presyn or postsyn".format(kind)
+        if kind == 'synapse':
+            assert len(datasets) == 2, "option kind set to synapse, " \
+                                       "provide PointsKeys for Pre- and Postsynapse"
+        else :
+            assert len(datasets) == 1
+
+
+
 
     def setup(self):
 
@@ -75,6 +93,7 @@ class Hdf5PointsSource(BatchProvider):
             # are unique and allow to find partner locations
 
             if PointsKeys.PRESYN in request.points_specs or PointsKeys.POSTSYN in request.points_specs:
+                assert self.kind == 'synapse'
                 # If only PRESYN or POSTSYN requested, assume PRESYN ROI = POSTSYN ROI.
                 pre_key = PointsKeys.PRESYN if PointsKeys.PRESYN in request.points_specs else PointsKeys.POSTSYN
                 post_key = PointsKeys.POSTSYN if PointsKeys.POSTSYN in request.points_specs else PointsKeys.PRESYN
@@ -82,16 +101,26 @@ class Hdf5PointsSource(BatchProvider):
                     pre_roi=request.points_specs[pre_key].roi,
                     post_roi=request.points_specs[post_key].roi,
                     syn_file=hdf_file)
+                points = {
+                    PointsKeys.PRESYN: presyn_points,
+                    PointsKeys.POSTSYN: postsyn_points}
+            else:
+                assert self.kind == 'presyn' or self.kind == 'postsyn'
+                synkey = list(self.datasets.items())[0][0] # only key of dic.
+                presyn_points, postsyn_points = self.__get_syn_points(
+                    pre_roi=request.points_specs[synkey].roi,
+                    post_roi=request.points_specs[synkey].roi,
+                    syn_file=hdf_file)
+                points = {
+                    synkey: presyn_points if self.kind == 'presyn' else postsyn_points
+                }
+
 
             for (points_key, request_spec) in request.points_specs.items():
                 logger.debug("Reading %s in %s...", points_key, request_spec.roi)
-                id_to_point = {
-                    PointsKeys.PRESYN: presyn_points,
-                    PointsKeys.POSTSYN: postsyn_points}[points_key]
-
                 points_spec = self.spec[points_key].copy()
                 points_spec.roi = request_spec.roi
-                batch.points[points_key] = Points(data=id_to_point, spec=points_spec)
+                batch.points[points_key] = Points(data=points[points_key], spec=points_spec)
 
         timing_process.stop()
         batch.profiling_stats.add(timing_process)
