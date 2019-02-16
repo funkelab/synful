@@ -102,19 +102,20 @@ class Hdf5PointsSource(BatchProvider):
         presyn_points_dict, postsyn_points_dict = {}, {}
         presyn_node_ids = syn_file['annotations/presynaptic_site/partners'][:, 0].tolist()
         postsyn_node_ids = syn_file['annotations/presynaptic_site/partners'][:, 1].tolist()
+        id_to_kind = {syn_id: 'PreSyn' for syn_id in presyn_node_ids}
+        id_to_kind.update({syn_id: 'PostSyn' for syn_id in postsyn_node_ids})
 
         for node_nr, node_id in enumerate(syn_file['annotations/ids']):
             location = syn_file['annotations/locations'][node_nr]
 
             # cremi synapse locations are in physical space
-            if node_id in presyn_node_ids:
-                kind = 'PreSyn'
+            kind = id_to_kind[node_id]
+            if kind == 'PreSyn':
                 if 'annotations/types' in syn_file:
                     assert syn_file['annotations/types'][node_nr] == 'presynaptic_site'
                 syn_id = int(np.where(presyn_node_ids == node_id)[0])
                 partner_node_id = postsyn_node_ids[syn_id]
-            elif node_id in postsyn_node_ids:
-                kind = 'PostSyn'
+            elif kind == 'PostSyn':
                 if 'annotations/types' in syn_file:
                     assert syn_file['annotations/types'][node_nr] == 'postsynaptic_site'
                 syn_id = int(np.where(postsyn_node_ids == node_id)[0])
