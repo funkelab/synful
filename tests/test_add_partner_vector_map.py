@@ -1,6 +1,5 @@
 import unittest
 
-# from syntist.gunpowder import ProviderTest
 from synful.gunpowder import AddPartnerVectorMap
 
 from gunpowder import *
@@ -11,17 +10,17 @@ import numpy as np
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger('synful.gunpowder').setLevel(logging.DEBUG)
+logging.getLogger('synful.gunpowder').setLevel(logging.INFO)
 
 
 class PointTestSource3D(BatchProvider):
-    def __init__(self, points, partners, labels=None, voxel_size=None):
+    def __init__(self, points, partners, objectmask=None, voxel_size=None):
         self.voxel_size = voxel_size
 
         self.points = points
 
         self.partners = partners
-        self.labels = labels
+        self.objectmask = objectmask
 
     def setup(self):
 
@@ -32,12 +31,12 @@ class PointTestSource3D(BatchProvider):
         self.provides(
             PointsKeys.POSTSYN,
             PointsSpec(roi=Roi((0, 0, 0), (200, 200, 200))))
-
-        # self.provides(
-        #     ArrayKeys.GT_LABELS,
-        #     ArraySpec(
-        #         roi=Roi((0, 0, 0), (200, 200, 200)),
-        #         voxel_size=self.voxel_size))
+        if self.objectmask is not None:
+            self.provides(
+                ArrayKeys.OBJECTMASK,
+                ArraySpec(
+                    roi=Roi((0, 0, 0), (200, 200, 200)),
+                    voxel_size=self.voxel_size))
 
     def provide(self, request):
 
@@ -74,15 +73,15 @@ class PointTestSource3D(BatchProvider):
             post_points,
             PointsSpec(roi=trg_points))
 
-        # if ArrayKeys.GT_LABELS in request:
-        #     roi_array = request[ArrayKeys.GT_LABELS].roi
-        #
-        #     spec = self.spec[ArrayKeys.GT_LABELS].copy()
-        #
-        #     spec.roi = roi_array
-        #     batch.arrays[ArrayKeys.GT_LABELS] = Array(
-        #         self.labels,
-        #         spec=spec)
+        if ArrayKeys.OBJECTMASK in request:
+            roi_array = request[ArrayKeys.OBJECTMASK].roi
+
+            spec = self.spec[ArrayKeys.OBJECTMASK].copy()
+
+            spec.roi = roi_array
+            batch.arrays[ArrayKeys.OBJECTMASK] = Array(
+                self.objectmask[(roi_array/self.voxel_size).to_slices()],
+                spec=ArraySpec(roi=roi_array, voxel_size=self.voxel_size))
 
         return batch
 
@@ -180,6 +179,95 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         res = batch[vectormap]
         self.assertTrue((res.data[:, 0, 0, 0] == np.array([50, 50, 0])).all())
         self.assertTrue((res.data[:, 6, 6, 6] == np.array([20, 20, -20])).all())
+
+    def test_intersecting_src_blobs(self):
+        vectormap = ArrayKey('VECTOR_MAP')
+        objectmask = ArrayKey('OBJECTMASK')
+        presyn = PointsKey('PRESYN')
+        postsyn = PointsKey('POSTSYN')
+
+        voxel_size = Coordinate((5, 5, 5))
+        spec = ArraySpec(voxel_size=voxel_size)
+
+        add_vector_map = AddPartnerVectorMap(
+            src_points=presyn,
+            trg_points=postsyn,
+            array=vectormap,
+            radius=60,  # 10 voxels,
+            trg_context=20,  # 10 voxels,,
+            array_spec=spec
+        )
+
+        points = {
+            1: Coordinate((20, 20, 50)),  # point1 in radius distance to point3
+            2: Coordinate((0, 0, 0)),
+            3: Coordinate((60, 60, 50)),
+            4: Coordinate((50, 50, 50)),
+        }
+
+        pipeline = (
+                PointTestSource3D(points=points, partners=[(1, 2), (3, 4)]) +
+                add_vector_map
+        )
+
+        request = BatchRequest()
+
+        roi = Roi((0, 0, 0), (200, 200, 200))
+
+        request[presyn] = PointsSpec(roi=roi)
+        request[postsyn] = PointsSpec(roi=roi)
+        request[vectormap] = ArraySpec(roi=roi)
+
+        with build(pipeline):
+            batch = pipeline.request_batch(request)
+
+        res = batch[vectormap]
+        test1 = Coordinate((30, 30, 50)) / voxel_size
+        test3 = Coordinate((50, 50, 50)) / voxel_size
+        # testpoint1 should be close to point1
+        self.assertTrue((res.data[:, test1[0], test1[1], test1[2]] == np.array(
+            [-30, -30, -50])).all())
+        # testpoint3 should be close to point3
+        self.assertTrue((res.data[:, test3[0], test3[1], test3[2]] == np.array(
+            [0, 0, 0])).all())
+
+        object_mask_ar = np.ones(
+            np.array((200 / 5, 200 / 5, 200 / 5), dtype=np.int))
+
+        object_mask_ar[points[3] / voxel_size] = 2
+
+        add_vector_map = AddPartnerVectorMap(
+            src_points=presyn,
+            trg_points=postsyn,
+            array=vectormap,
+            radius=50,  # 10 voxels,
+            trg_context=20,  # 10 voxels,,
+            array_spec=spec,
+            mask=objectmask
+        )
+
+        pipeline = (
+                PointTestSource3D(points=points,
+                                  partners=[(1, 2), (3, 4)],
+                                  objectmask=object_mask_ar,
+                                  voxel_size=voxel_size) +
+                add_vector_map
+        )
+
+        request[presyn] = PointsSpec(roi=roi)
+        request[postsyn] = PointsSpec(roi=roi)
+        request[vectormap] = ArraySpec(roi=roi)
+        request[objectmask] = ArraySpec(roi=roi)
+
+        with build(pipeline):
+            batch = pipeline.request_batch(request)
+        res = batch[vectormap]
+        # 30, 30, 50 should be close to point1
+        self.assertTrue((res.data[:, test1[0], test1[1], test1[2]] == np.array(
+            [-30, -30, -50])).all())
+        # 50, 50, 50 should also be close to point1 because of object mask
+        self.assertTrue((res.data[:, test3[0], test3[1], test3[2]] == np.array(
+            [-50, -50, -50])).all())
 
 
 if __name__ == '__main__':

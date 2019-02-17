@@ -1,3 +1,5 @@
+from scipy.spatial import KDTree
+
 from gunpowder import BatchFilter
 from gunpowder.array import Array
 from gunpowder.array_spec import ArraySpec
@@ -28,7 +30,9 @@ class AddPartnerVectorMap(BatchFilter):
             The key of the array to create.
 
         radius (``tuple`` of ``float``):
-            Radius of the ball around source points in which vectors are created.
+            Radius of the ball around source points in which vectors are
+            created. If two or more src nodes are in distance < radius,
+            voxels of overlapping regions are assigned the closest src point to.
 
         trg_context (``tuple`` of ``int``):
             n-dim tuple which defines padding of trg_points request in world units to create src vectors that point
@@ -209,6 +213,11 @@ class AddPartnerVectorMap(BatchFilter):
             "Adding vectors for %d points...",
             len(src_points.data))
 
+        # For each src point, get a point mask.
+        union_mask = np.zeros(shape, dtype=np.int32)
+        point_masks = []
+        points_p = []
+        targets = []
         for point_id, point in src_points.data.items():
 
             # get the voxel coordinate, 'Coordinate' ensures integer
@@ -220,7 +229,8 @@ class AddPartnerVectorMap(BatchFilter):
                     v)
                 continue
 
-            assert len(point.partner_ids) == 1, 'AddPartnerVectorMap only implemented for single target point per src point'
+            assert len(
+                point.partner_ids) == 1, 'AddPartnerVectorMap only implemented for single target point per src point'
             trg_id = point.partner_ids[0]
 
             if trg_id not in trg_points.data:
@@ -244,7 +254,6 @@ class AddPartnerVectorMap(BatchFilter):
             if mask is not None:
                 label = mask.data[v]
                 object_mask = mask.data == label
-
             logger.debug(
                 "Rasterizing point %s at %s",
                 point.location,
@@ -261,8 +270,34 @@ class AddPartnerVectorMap(BatchFilter):
 
             if mask is not None:
                 point_mask &= object_mask
+            union_mask += np.array(point_mask, dtype=np.int32)
+            point_masks.append(point_mask)
+            targets.append(target)
+            points_p.append(v * voxel_size)
 
-            target_vectors[0][point_mask] = target.location[0] - coords[0][point_mask]
-            target_vectors[1][point_mask] = target.location[1] - coords[1][point_mask]
-            target_vectors[2][point_mask] = target.location[2] - coords[2][point_mask]
+        assert len(targets) == len(points_p) == len(point_masks)
+        if len(points_p) == 0:
+            return target_vectors  # Leave early if there are no points.
+        for point_mask in point_masks:
+            point_mask[union_mask > 1] = False # Remove overlap regions.
+        intersect_points = np.where(union_mask > 1)
+        logger.debug('#voxels of overlapping src blobs:{}'.format(
+            len(intersect_points[0])))
+
+        # Assign overlapping voxels to their closest src node.
+        kd = KDTree(points_p)
+        for intersect_point in zip(*intersect_points):
+            p = Coordinate(intersect_point) * voxel_size
+            dist, node_id = kd.query(p)
+            point_masks[node_id][p / voxel_size] = True
+
+        # Calculate actual vectors with src blobs corrected for overlaps.
+        for ii, point_mask in enumerate(point_masks):
+            target = targets[ii]
+            target_vectors[0][point_mask] = target.location[0] - coords[0][
+                point_mask]
+            target_vectors[1][point_mask] = target.location[1] - coords[1][
+                point_mask]
+            target_vectors[2][point_mask] = target.location[2] - coords[2][
+                point_mask]
         return target_vectors
