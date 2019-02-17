@@ -118,6 +118,8 @@ class AddPartnerVectorMap(BatchFilter):
                 "Voxel size of mask and rasterized volume need to be equal")
 
             new_mask_roi = src_roi.snap_to_grid(mask_voxel_size)
+            # Restrict request to array provided.
+            new_mask_roi = new_mask_roi.intersect(self.spec[self.mask].roi)
             if self.mask in request:
                 request[self.mask].roi = \
                     request[self.mask].roi.union(new_mask_roi)
