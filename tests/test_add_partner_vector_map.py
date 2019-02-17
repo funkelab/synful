@@ -1,13 +1,12 @@
+import logging
 import unittest
 
-from synful.gunpowder import AddPartnerVectorMap
+import numpy as np
 
 from gunpowder import *
 from gunpowder.contrib.points import PreSynPoint, PostSynPoint
 from gunpowder.points import Points
-
-import numpy as np
-import logging
+from synful.gunpowder import AddPartnerVectorMap
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('synful.gunpowder').setLevel(logging.INFO)
@@ -80,7 +79,7 @@ class PointTestSource3D(BatchProvider):
 
             spec.roi = roi_array
             batch.arrays[ArrayKeys.OBJECTMASK] = Array(
-                self.objectmask[(roi_array/self.voxel_size).to_slices()],
+                self.objectmask[(roi_array / self.voxel_size).to_slices()],
                 spec=ArraySpec(roi=roi_array, voxel_size=self.voxel_size))
 
         return batch
@@ -88,7 +87,6 @@ class PointTestSource3D(BatchProvider):
 
 class TestAddPartnerVectorMap(unittest.TestCase):
     def test_output_basics(self):
-
         vectormap = ArrayKey('VECTOR_MAP')
         presyn = PointsKey('PRESYN')
         postsyn = PointsKey('POSTSYN')
@@ -100,22 +98,23 @@ class TestAddPartnerVectorMap(unittest.TestCase):
             src_points=presyn,
             trg_points=postsyn,
             array=vectormap,
-            radius=1, # 10 voxels,
-            trg_context=20, # 10 voxels,,
+            radius=1,  # 10 voxels,
+            trg_context=20,  # 10 voxels,,
             array_spec=spec
         )
 
         points = {
             1: Coordinate((40, 40, 40)),
             2: Coordinate((90, 90, 40)),
-            3: Coordinate((70, 70, 70)), # should be ignored, as partner is far outside
+            3: Coordinate((70, 70, 70)),
+        # should be ignored, as partner is far outside
             4: Coordinate((300, 300, 300)),
         }
 
-
         pipeline = (
-            PointTestSource3D(points=points, partners=[(1, 2), (3, 4)], voxel_size=voxel_size) +
-            add_vector_map
+                PointTestSource3D(points=points, partners=[(1, 2), (3, 4)],
+                                  voxel_size=voxel_size) +
+                add_vector_map
         )
 
         request = BatchRequest()
@@ -126,7 +125,6 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         request[postsyn] = PointsSpec(roi=roi)
         request[vectormap] = ArraySpec(roi=roi)
 
-
         with build(pipeline):
             batch = pipeline.request_batch(request)
 
@@ -136,7 +134,6 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         self.assertEqual(np.count_nonzero(res.data[:, 1:, 1:, 1:]), 0)
 
     def test_output_outside_roi(self):
-
         vectormap = ArrayKey('VECTOR_MAP')
         presyn = PointsKey('PRESYN')
         postsyn = PointsKey('POSTSYN')
@@ -154,9 +151,11 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         )
 
         points = {
-            1: Coordinate((30, 30, 30)), # should be included, since radius is large enough to reach into ROI.
+            1: Coordinate((30, 30, 30)),
+        # should be included, since radius is large enough to reach into ROI.
             2: Coordinate((90, 90, 40)),
-            3: Coordinate((70, 70, 70)), # should be included, since partner is within context
+            3: Coordinate((70, 70, 70)),
+        # should be included, since partner is within context
             4: Coordinate((90, 90, 50)),
         }
 

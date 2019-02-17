@@ -1,4 +1,6 @@
-from scipy.spatial import KDTree
+import logging
+
+import numpy as np
 
 from gunpowder import BatchFilter
 from gunpowder.array import Array
@@ -7,8 +9,7 @@ from gunpowder.coordinate import Coordinate
 from gunpowder.morphology import enlarge_binary_map
 from gunpowder.points_spec import PointsSpec
 from gunpowder.roi import Roi
-import logging
-import numpy as np
+from scipy.spatial import KDTree
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,9 @@ class AddPartnerVectorMap(BatchFilter):
             voxels of overlapping regions are assigned the closest src point to.
 
         trg_context (``tuple`` of ``int``):
-            n-dim tuple which defines padding of trg_points request in world units to create src vectors that point
-            to target locations outside src roi.
+            n-dim tuple which defines padding of trg_points request in world
+            units to create src vectors that point to target locations
+            outside src roi.
 
         mask (:class:`ArrayKey`, optional):
             Used to mask the rasterization of source points. The array is assumed to
@@ -49,7 +51,8 @@ class AddPartnerVectorMap(BatchFilter):
             voxel size.
     '''
 
-    def __init__(self, src_points, trg_points, array, radius, trg_context, mask=None, array_spec=None):
+    def __init__(self, src_points, trg_points, array, radius, trg_context,
+                 mask=None, array_spec=None):
 
         self.src_points = src_points
         self.trg_points = trg_points
@@ -145,7 +148,8 @@ class AddPartnerVectorMap(BatchFilter):
         logger.debug("Data roi in voxels: %s", data_roi)
         logger.debug("Data roi in world units: %s", data_roi * voxel_size)
 
-        mask_array = None if self.mask is None else batch.arrays[self.mask].crop(enlarged_vol_roi)
+        mask_array = None if self.mask is None else batch.arrays[
+            self.mask].crop(enlarged_vol_roi)
 
         partner_vectors_data = self.__draw_partner_vectors(
             src_points,
@@ -167,22 +171,27 @@ class AddPartnerVectorMap(BatchFilter):
 
         # restore requested ROI of src and target points.
         if self.src_points in request:
-            self.__restore_points_roi(request, self.src_points, batch.points[self.src_points])
+            self.__restore_points_roi(request, self.src_points,
+                                      batch.points[self.src_points])
         if self.trg_points in request:
-            self.__restore_points_roi(request, self.trg_points, batch.points[self.trg_points])
+            self.__restore_points_roi(request, self.trg_points,
+                                      batch.points[self.trg_points])
         # restore requested mask
         if self.mask is not None:
-            batch.arrays[self.mask] = batch.arrays[self.mask].crop(request[self.mask].roi)
+            batch.arrays[self.mask] = batch.arrays[self.mask].crop(
+                request[self.mask].roi)
 
     def __restore_points_roi(self, request, points_key, points):
         request_roi = request[points_key].roi
         points.spec.roi = request_roi
-        points.data = {i: p for i, p in points.data.items() if request_roi.contains(p.location)}
+        points.data = {i: p for i, p in points.data.items() if
+                       request_roi.contains(p.location)}
         # for i, p in points.data.items():
         #     if not request_roi.contains(p.location):
         #         del points.data[i]
 
-    def __draw_partner_vectors(self, src_points, trg_points, data_roi, voxel_size, offset, radius, mask=None):
+    def __draw_partner_vectors(self, src_points, trg_points, data_roi,
+                               voxel_size, offset, radius, mask=None):
 
         # 3D: z, y, x
         shape = data_roi.get_shape()
@@ -209,8 +218,6 @@ class AddPartnerVectorMap(BatchFilter):
 
         target_vectors = np.zeros_like(coords)
 
-
-
         logger.debug(
             "Adding vectors for %d points...",
             len(src_points.data))
@@ -232,7 +239,9 @@ class AddPartnerVectorMap(BatchFilter):
                 continue
 
             assert len(
-                point.partner_ids) == 1, 'AddPartnerVectorMap only implemented for single target point per src point'
+                point.partner_ids) == 1, \
+                'AddPartnerVectorMap only implemented for single target point ' \
+                'per src point'
             trg_id = point.partner_ids[0]
 
             if trg_id not in trg_points.data:
@@ -281,7 +290,7 @@ class AddPartnerVectorMap(BatchFilter):
         if len(points_p) == 0:
             return target_vectors  # Leave early if there are no points.
         for point_mask in point_masks:
-            point_mask[union_mask > 1] = False # Remove overlap regions.
+            point_mask[union_mask > 1] = False  # Remove overlap regions.
         intersect_points = np.where(union_mask > 1)
         logger.debug('#voxels of overlapping src blobs:{}'.format(
             len(intersect_points[0])))
