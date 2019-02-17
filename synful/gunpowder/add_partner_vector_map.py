@@ -46,13 +46,19 @@ class AddPartnerVectorMap(BatchFilter):
             rasterized is used to intersect the rasterization to keep it inside
             the specific object.
 
+        pointmask (:class:`ArrayKey`, optional):
+            Key for a pointmask. If provided, an array is created,
+            in which all blob regions for which vectors have been calculated,
+            is marked with a 1. Array has same spec as array.
+
+
         array_spec (:class:``ArraySpec``, optional):
             The spec of the array to create. Use this to set the datatype and
             voxel size.
     '''
 
     def __init__(self, src_points, trg_points, array, radius, trg_context,
-                 mask=None, array_spec=None):
+                 mask=None, pointmask=None, array_spec=None):
 
         self.src_points = src_points
         self.trg_points = trg_points
@@ -60,6 +66,7 @@ class AddPartnerVectorMap(BatchFilter):
         self.radius = np.array([radius]).flatten().astype(np.float32)
         self.trg_context = np.array([trg_context]).flatten().astype(np.int)
         self.mask = mask
+        self.pointmask = pointmask
         if array_spec is None:
             self.array_spec = ArraySpec()
         else:
@@ -79,6 +86,10 @@ class AddPartnerVectorMap(BatchFilter):
         self.provides(
             self.array,
             self.array_spec)
+        if self.pointmask is not None:
+            self.provides(
+                self.pointmask,
+                self.array_spec)
 
         self.enable_autoskip()
 
@@ -151,7 +162,7 @@ class AddPartnerVectorMap(BatchFilter):
         mask_array = None if self.mask is None else batch.arrays[
             self.mask].crop(enlarged_vol_roi)
 
-        partner_vectors_data = self.__draw_partner_vectors(
+        partner_vectors_data, pointmask = self.__draw_partner_vectors(
             src_points,
             batch.points[self.trg_points],
             data_roi,
@@ -169,6 +180,15 @@ class AddPartnerVectorMap(BatchFilter):
         logger.debug("Cropping partner vectors to %s", request[self.array].roi)
         batch.arrays[self.array] = partner_vectors.crop(request[self.array].roi)
 
+        if self.pointmask is not None and self.pointmask in request:
+            spec = self.spec[self.array].copy()
+            spec.roi = data_roi * voxel_size
+            pointmask = Array(
+                data=np.array(pointmask, dtype=spec.dtype),
+                spec=spec)
+            batch.arrays[self.pointmask] = pointmask.crop(
+                request[self.pointmask].roi)
+
         # restore requested ROI of src and target points.
         if self.src_points in request:
             self.__restore_points_roi(request, self.src_points,
@@ -176,7 +196,7 @@ class AddPartnerVectorMap(BatchFilter):
         if self.trg_points in request:
             self.__restore_points_roi(request, self.trg_points,
                                       batch.points[self.trg_points])
-        # restore requested mask
+        # restore requested objectmask
         if self.mask is not None:
             batch.arrays[self.mask] = batch.arrays[self.mask].crop(
                 request[self.mask].roi)
@@ -311,4 +331,4 @@ class AddPartnerVectorMap(BatchFilter):
                 point_mask]
             target_vectors[2][point_mask] = target.location[2] - coords[2][
                 point_mask]
-        return target_vectors
+        return target_vectors, np.array(union_mask, dtype=np.bool)

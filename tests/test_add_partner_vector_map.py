@@ -184,6 +184,7 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         objectmask = ArrayKey('OBJECTMASK')
         presyn = PointsKey('PRESYN')
         postsyn = PointsKey('POSTSYN')
+        pointmask = ArrayKey('POINTMASK')
 
         voxel_size = Coordinate((5, 5, 5))
         spec = ArraySpec(voxel_size=voxel_size)
@@ -242,7 +243,8 @@ class TestAddPartnerVectorMap(unittest.TestCase):
             radius=50,  # 10 voxels,
             trg_context=20,  # 10 voxels,,
             array_spec=spec,
-            mask=objectmask
+            mask=objectmask,
+            pointmask=pointmask
         )
 
         pipeline = (
@@ -257,6 +259,7 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         request[postsyn] = PointsSpec(roi=roi)
         request[vectormap] = ArraySpec(roi=roi)
         request[objectmask] = ArraySpec(roi=roi)
+        request[pointmask] = ArraySpec(roi=roi)
 
         with build(pipeline):
             batch = pipeline.request_batch(request)
@@ -267,6 +270,9 @@ class TestAddPartnerVectorMap(unittest.TestCase):
         # 50, 50, 50 should also be close to point1 because of object mask
         self.assertTrue((res.data[:, test3[0], test3[1], test3[2]] == np.array(
             [-50, -50, -50])).all())
+
+        # Also test pointmask
+        self.assertTrue(batch[pointmask].data[test1[0], test1[1], test1[2]] == 1)
 
 
 if __name__ == '__main__':
