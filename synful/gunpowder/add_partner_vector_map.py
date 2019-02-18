@@ -308,7 +308,7 @@ class AddPartnerVectorMap(BatchFilter):
 
         assert len(targets) == len(points_p) == len(point_masks)
         if len(points_p) == 0:
-            return target_vectors  # Leave early if there are no points.
+            return target_vectors, np.array(union_mask, dtype=np.bool)  # Leave early if there are no points.
         for point_mask in point_masks:
             point_mask[union_mask > 1] = False  # Remove overlap regions.
         intersect_points = np.where(union_mask > 1)
