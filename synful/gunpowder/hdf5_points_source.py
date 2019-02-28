@@ -129,42 +129,32 @@ class Hdf5PointsSource(BatchProvider):
 
     def __get_syn_points(self, pre_roi, post_roi, syn_file):
         presyn_points_dict, postsyn_points_dict = {}, {}
-        presyn_node_ids = syn_file['annotations/presynaptic_site/partners'][:, 0].tolist()
-        postsyn_node_ids = syn_file['annotations/presynaptic_site/partners'][:, 1].tolist()
-        id_to_kind = {syn_id: 'PreSyn' for syn_id in presyn_node_ids}
-        id_to_kind.update({syn_id: 'PostSyn' for syn_id in postsyn_node_ids})
+        annotation_ids = syn_file['annotations/ids'][:]
+        locs = syn_file['annotations/locations'][:]
+        syn_id = 0
+        for pre, post in list(
+                syn_file['annotations/presynaptic_site/partners'][:]):
+            pre_index = int(np.where(pre == annotation_ids)[0][0])
+            post_index = int(np.where(post == annotation_ids)[0][0])
+            pre_site = locs[pre_index]
+            post_site = locs[post_index]
 
-        for node_nr, node_id in enumerate(syn_file['annotations/ids']):
-            location = syn_file['annotations/locations'][node_nr]
+            if pre_roi.contains(Coordinate(pre_site)):
+                syn_point = PreSynPoint(location=pre_site,
+                                        location_id=pre_index,
+                                        synapse_id=syn_id,
+                                        partner_ids=[post_index])
+                presyn_points_dict[pre_index] = copy.deepcopy(syn_point)
+            if post_roi.contains(Coordinate(post_site)):
+                syn_point = PostSynPoint(location=post_site,
+                                         location_id=post_index,
+                                         synapse_id=syn_id,
+                                         partner_ids=[pre_index])
+                postsyn_points_dict[post_index] = copy.deepcopy(syn_point)
+            if pre_roi.contains(Coordinate(pre_site)) or post_roi.contains(Coordinate(post_site)):
+                syn_id += 1
 
-            # cremi synapse locations are in physical space
-            kind = id_to_kind[node_id]
-            if kind == 'PreSyn':
-                if 'annotations/types' in syn_file:
-                    assert syn_file['annotations/types'][node_nr] == 'presynaptic_site'
-                syn_id = int(np.where(presyn_node_ids == node_id)[0])
-                partner_node_id = postsyn_node_ids[syn_id]
-            elif kind == 'PostSyn':
-                if 'annotations/types' in syn_file:
-                    assert syn_file['annotations/types'][node_nr] == 'postsynaptic_site'
-                syn_id = int(np.where(postsyn_node_ids == node_id)[0])
-                partner_node_id = presyn_node_ids[syn_id]
-            else:
-                raise Exception('Node id neither pre- no post-synaptic')
 
-            partners_ids = [int(partner_node_id)]
-            location_id = int(node_id)
-
-            props = {}
-            # create synpaseLocation & add to dict
-            if kind == 'PreSyn' and pre_roi.contains(Coordinate(location)):
-                syn_point = PreSynPoint(location=location, location_id=location_id,
-                                        synapse_id=syn_id, partner_ids=partners_ids, props=props)
-                presyn_points_dict[int(node_id)] = copy.deepcopy(syn_point)
-            elif kind == 'PostSyn' and post_roi.contains(Coordinate(location)):
-                syn_point = PostSynPoint(location=location, location_id=location_id,
-                                         synapse_id=syn_id, partner_ids=partners_ids, props=props)
-                postsyn_points_dict[int(node_id)] = copy.deepcopy(syn_point)
 
         return presyn_points_dict, postsyn_points_dict
 
