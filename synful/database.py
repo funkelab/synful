@@ -356,7 +356,7 @@ class DAGDatabase(object):
 
         nodes_db = []
         for n in nodes:
-            node_keys = n.keys()
+            node_keys = list(n.keys())
             node_keys.remove('position')
             node_dic = {
                 'z': int(float(n['position'][0])),
