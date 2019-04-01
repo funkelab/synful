@@ -19,7 +19,7 @@ From: ubuntu:18.04
 
 %labels
 
-    Version 0.1 # synful version: 657f1806196703b2a13ebe33442422948e24cf0e
+    Version 0.1 # synful version: 90bb992b6e4c903295d1138c6a5b1853cd8fd27d
 
 %post
 
@@ -53,7 +53,7 @@ From: ubuntu:18.04
 
     GUNPOWDER_ROOT=/src/gunpowder
     GUNPOWDER_REPOSITORY=https://github.com/funkey/gunpowder.git
-    GUNPOWDER_REVISION=f681a915b491d3ffa5f16ee0af098f94238ca4fd
+    GUNPOWDER_REVISION=3054ebd8286e4c680bc7b73582d3207bdcd00922
 
     cd ${GUNPOWDER_ROOT}
     git clone ${GUNPOWDER_REPOSITORY} . && \
@@ -86,6 +86,18 @@ From: ubuntu:18.04
 
     pip install mahotas
     pip install pymongo
+    pip install neuroglancer
+
+    # Install ZARR
+    ZARR_ROOT=/src/zarr
+    ZARR_REPOSITORY=https://github.com/funkey/zarr
+    ZARR_REVISION=9ddf849a6e3329f5ff361ebf6156712926e2fdfe
+
+    cd ${ZARR_ROOT}
+    git clone ${ZARR_REPOSITORY} . && \
+    git checkout ${ZARR_REVISION}
+    pip install -r requirements.txt
+    python setup.py install
 
     # install synful
     cd /src/synful
