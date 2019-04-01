@@ -496,3 +496,29 @@ class DAGDatabase(object):
             }))
 
         return edges
+
+
+class ResultDatabase(object):
+    """" Result pymongo database interface"""
+
+    def __init__(self, db_name, db_host='localhost', db_col_name='default',
+                 mode='r'):
+        self.db_name = db_name
+        self.db_host = db_host
+        self.db_col = db_col_name
+        self.mode = mode
+        self.client = MongoClient(host=db_host)
+        self.database = self.client[db_name]
+
+        if mode == 'w':
+            self.database.drop_collection(db_col_name)
+            logger.debug('overwriting collection %s' % db_col_name)
+
+        self.collection = self.database[db_col_name]
+
+        if mode == 'w':
+            self.collection.create_index(
+                [
+                    ('fscore', ASCENDING)
+                ],
+                name='fscore')
