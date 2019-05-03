@@ -5,6 +5,8 @@ import numpy.ma as ma
 from scipy import ndimage
 from skimage import measure
 
+from .nms import find_maxima
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,15 +48,19 @@ class SynapseExtractionParameters(object):
             loc_type='edt',
             # How to extract location from blob: edt --> euclidean distance transform
             score_thr=None,  # If locs should be filtered with threshold
-            score_type=None  # What kind of score to use.
+            score_type=None,  # What kind of score to use.
+            nms_radius=None
     ):
-        assert extract_type == 'cc', 'Synapse Detection currently only ' \
-                                     'implemented with option cc'  # TODO: Implement nms
+        # assert extract_type == 'cc', 'Synapse Detection currently only ' \
+        #                              'implemented with option cc'  # TODO: Implement nms
+        if extract_type == 'nms':
+            assert nms_radius is not None
         self.extract_type = extract_type
-        self.cc_threshold = cc_threshold
-        self.loc_type = loc_type
-        self.score_type = score_type
+        self.cc_threshold = cc_threshold if extract_type == 'cc' else None
+        self.loc_type = loc_type if extract_type == 'cc' else None
+        self.score_type = score_type if extract_type == 'cc' else None
         self.score_thr = score_thr
+        self.nms_radius = nms_radius if extract_type == 'nms' else None
 
 
 def __from_labels_to_edt(labels, voxel_size):
@@ -204,15 +210,26 @@ def find_locations(probmap, parameters,
     if parameters.extract_type == 'cc':
         regions, pred_labels = __from_probmap_to_labels(probmap,
                                                         parameters.cc_threshold)
-    if parameters.loc_type == 'edt':
+    elif parameters.extract_type == 'nms':
+        centers, __, __ = find_maxima(probmap, list(voxel_size),
+                                      list(parameters.nms_radius))
+        pred_locs = []
+        scorelist = []
+        for loc in centers.values():
+            if loc['score'] > parameters.score_thr:
+                pred_locs.append(loc['center'] * voxel_size)
+                scorelist.append(loc['score'])
+    else:
+        raise RuntimeError(
+            'unknown extract_type option set: {}'.format(parameters.loc_type))
+
+    if parameters.extract_type == 'cc':
+        assert parameters.loc_type == 'edt', 'unknown loc_type option set: {}'.format(parameters.loc_type)
         pred_locs, scorelist = __from_labels_to_locs(pred_labels,
                                                      regions,
                                                      voxel_size,
                                                      score_vol=probmap,
                                                      score_type=parameters.score_type)
-    else:
-        raise RuntimeError(
-            'unknown loc_type option set: {}'.format(parameters.loc_type))
 
     return pred_locs, scorelist
 
