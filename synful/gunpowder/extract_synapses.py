@@ -1,12 +1,15 @@
+from __future__ import division
+
 import logging
 import time
 
 import gunpowder as gp
 import numpy as np
+from funlib.math import cantor_number
 from gunpowder import BatchFilter
 from gunpowder.contrib.points import PreSynPoint, PostSynPoint
 
-from .. import detection, synapse
+from .. import detection, synapse, database
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +17,7 @@ logger = logging.getLogger(__name__)
 class ExtractSynapses(BatchFilter):
     '''Extract synaptic partners from 2 prediction channels. One prediction map
     indicates the location (m_channel), the second map (z_channel) indicates the
-    direction to its synaptic partner.
+    direction to its synaptic partner. Optionally, writes it to a database.
 
     Args:
 
@@ -25,17 +28,38 @@ class ExtractSynapses(BatchFilter):
             The key of the array to extract vectors from.
 
         points (:class:``PointsKey``):
-            The key of the presynaptic points to create.
+            The key of the presynaptic points to create. Note, that only those
+            synaptic partners will be in roi, where both pre and postsynaptic
+            site are fully contained in ROI.
 
         points (:class:``PointsKey``):
             The key of the postsynaptic points to create.
 
         settings (:class:``SynapseExtractionParameters``):
             Which settings to use to extract synapses.
+
+        db_name (``string``):
+            If db_name and db_host provided, synapses are written out into
+            database. Only those synapses are written out, where the presynaptic
+            site is contained in output ROI (the location of the postsynaptic
+            site does not matter).
+
+        db_host (``string``):
+            Database host.
+
+        db_col_name (``string``):
+            Name of the mongodb collection, that the synapses are written to.
+
     '''
 
     def __init__(self, m_array, d_array, srcpoints, trgpoints,
-                 settings=None, context=120):
+                 settings=None, context=120,
+                 db_name=None, db_host=None, db_col_name=None):
+        if db_name is not None or db_host is not None:
+            if db_host is None or db_name is None:
+                logger.warning(
+                    'If synapses are supposed to be written out to database, '
+                    'both db_name and db_host must be provided')
 
         self.m_array = m_array
         self.d_array = d_array
@@ -43,12 +67,12 @@ class ExtractSynapses(BatchFilter):
         self.trgpoints = trgpoints
         self.settings = settings
         self.context = [context]
+        self.db_name = db_name
+        self.db_host = db_host
+        self.db_col_name = db_col_name
 
     def setup(self):
 
-        m_roi = self.spec[self.m_array].roi
-        # self.spec_src = gp.PointsSpec(roi=m_roi.copy())
-        # self.spec_trg = gp.PointsSpec(roi=m_roi.copy())
         self.spec_src = gp.PointsSpec()
         self.spec_trg = gp.PointsSpec()
 
@@ -60,19 +84,14 @@ class ExtractSynapses(BatchFilter):
     def prepare(self, request):
 
         context = self.context
-        # dims = self.array_spec.roi.dims()
-        # dims = self.spec_src.roi.dims()
-        # dims = request[self.m_array].spec.roi.dims()
-        dims = 3
+        dims = request[self.srcpoints].roi.dims()
 
-        # if len(context) == 1:
-        #     context = context.repeat(dims)
         assert type(context) == list
         if len(context) == 1:
             context = context * dims
 
-        # request array in a larger area to get rasterization from outside
-        # points
+        # request array in a larger area to get predictions from outside
+        # write roi
         m_roi = request[self.srcpoints].roi.grow(
             gp.Coordinate(context),
             gp.Coordinate(context))
@@ -110,7 +129,7 @@ class ExtractSynapses(BatchFilter):
         predicted_syns, scores = detection.find_locations(mchannel.data,
                                                           self.settings,
                                                           mchannel.spec.voxel_size)
-        logger.info('find lcoations %0.2f' % (time.time() - start_time))
+        logger.debug('find locations %0.2f' % (time.time() - start_time))
         # Filter synapses for scores.
         new_scorelist = []
         if self.settings.score_thr is not None:
@@ -126,10 +145,9 @@ class ExtractSynapses(BatchFilter):
             predicted_syns = filtered_list
             scores = new_scorelist
         start_time = time.time()
-        # np.stack([dchannel.data]*3)
-        target_sites = detection.find_targets(predicted_syns, dchannel.data * 0,
+        target_sites = detection.find_targets(predicted_syns, dchannel.data,
                                               voxel_size=dchannel.spec.voxel_size)
-        logger.info('find targets %0.2f' % (time.time() - start_time))
+        logger.debug('find targets %0.2f' % (time.time() - start_time))
 
         # Synapses need to be shifted to the global ROI
         # (currently aligned with arrayroi)
@@ -145,13 +163,27 @@ class ExtractSynapses(BatchFilter):
 
         srcroi = request[self.srcpoints].roi
 
+        if self.db_name is not None and self.db_host is not None:
+            db_col_name = 'syn' if self.db_col_name is None else self.db_col_name
+            nodes, edges = self.__from_synapses_to_nodes_and_edges(synapses,
+                                                                   roi=srcroi)
+
+            dag_db = database.DAGDatabase(self.db_name, self.db_host,
+                                          db_col_name=db_col_name,
+                                          mode='r+')
+            dag_db.write_nodes(nodes)
+            dag_db.write_edges(edges)
+
         # Bring into gunpowder format
         srcpoints = {}
         trgpoints = {}
         syn_id = 0
         for syn in synapses:
             loc = gp.Coordinate(syn.location_pre)
-            if srcroi.contains(syn.location_pre):
+            if srcroi.contains(syn.location_pre) and srcroi.contains(
+                    syn.location_post):  # TODO: currently, gunpowder complains
+                # about points being outside ROI, thus can only provide synapses
+                # where pre and point are inside ROI
                 loc_index = syn_id * 2
                 syn_point = PreSynPoint(location=loc,
                                         location_id=loc_index,
@@ -168,3 +200,33 @@ class ExtractSynapses(BatchFilter):
                 trgpoints[loc_index + 1] = syn_point
                 syn_id += 1
         return srcpoints, trgpoints
+
+    def __from_synapse_to_node(self, synapse, id=None, pre=True):
+        node = {'id': id}
+        if pre:
+            node['position'] = synapse.location_pre
+        else:
+            node['position'] = synapse.location_post
+        node['score'] = np.double(synapse.score)
+
+        return node
+
+    def __from_synapses_to_nodes_and_edges(self, synapses, roi=None):
+        nodes = []
+        edges = []
+        for synapse in synapses:
+            pre_node_inside = True
+            if roi is not None:
+                pre_node_inside = roi.contains(synapse.location_pre)
+
+            if pre_node_inside:
+                id_bump = cantor_number(synapse.location_pre)
+                node_pre = self.__from_synapse_to_node(synapse, id=id_bump,
+                                                       pre=True)
+                node_post = self.__from_synapse_to_node(synapse, id=-id_bump,
+                                                        pre=False)
+                edge = {'source': id_bump}
+                edge['target'] = -id_bump
+                edges.append(edge)
+                nodes.extend([node_pre, node_post])
+        return nodes, edges
