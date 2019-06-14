@@ -96,12 +96,12 @@ def __find_boundaries(labels):
         shift_n = [slice(None)] * dims
         shift_n[d] = slice(0, in_shape[d] - 1)
 
-        diff = (labels[shift_p] - labels[shift_n]) != 0
+        diff = (labels[tuple(shift_p)] - labels[tuple(shift_n)]) != 0
 
         target = [slice(None, None, 2)] * dims
         target[d] = slice(1, out_shape[d], 2)
 
-        boundaries[target] = diff
+        boundaries[tuple(target)] = diff
 
     return boundaries
 
