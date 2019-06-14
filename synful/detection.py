@@ -266,7 +266,8 @@ def find_targets(source_locs, dirvectors,
     for index in sorted(to_remove, reverse=True):
         del source_locs[index]
         del target_locs[index]
-    logger.debug('Average distance of synapses %0.2f' % np.mean(distances))
+    if len(distances) > 0:
+        logger.debug('Average distance of synapses %0.2f' % np.mean(distances))
     logger.debug('Removed {} synapses because distance '
                  'smaller than {}'.format(len(to_remove), min_dist))
     return target_locs
