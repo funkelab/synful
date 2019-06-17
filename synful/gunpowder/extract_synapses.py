@@ -40,8 +40,8 @@ class ExtractSynapses(BatchFilter):
 
         db_name (``string``):
             If db_name and db_host provided, synapses are written out into
-            database. Only those synapses are written out, where the presynaptic
-            site is contained in output ROI (the location of the postsynaptic
+            database. Only those synapses are written out, where the postsynaptic
+            site is contained in output ROI (the location of the presynaptic
             site does not matter).
 
         db_host (``string``):
@@ -49,6 +49,14 @@ class ExtractSynapses(BatchFilter):
 
         db_col_name (``string``):
             Name of the mongodb collection, that the synapses are written to.
+
+        pre_to_post (``bool``):
+            If set to True, it is assumed that m_array is indicating the
+            presence of presynaptic location, and d_array is encoding the
+            direction to the postsynaptic partner. If set to False, m_array
+            indicates postsynaptic location, and d_array the direction to the
+            presynaptic partner. (Only relevant for writing synapses out
+            to a database.)
 
     '''
 
@@ -70,6 +78,7 @@ class ExtractSynapses(BatchFilter):
         self.db_name = db_name
         self.db_host = db_host
         self.db_col_name = db_col_name
+        self.pre_to_post = False
 
     def setup(self):
 
@@ -151,15 +160,17 @@ class ExtractSynapses(BatchFilter):
 
         # Synapses need to be shifted to the global ROI
         # (currently aligned with arrayroi)
-        start_time = time.time()
         for loc in predicted_syns:
             loc += np.array(mchannel.spec.roi.get_begin())
         for loc in target_sites:
             loc += np.array(dchannel.spec.roi.get_begin())
-        print(time.time() - start_time, 'forloop')
 
-        synapses = synapse.create_synapses(predicted_syns, target_sites,
-                                           scores=scores)
+        if self.pre_to_post:
+            synapses = synapse.create_synapses(predicted_syns, target_sites,
+                                               scores=scores)
+        else:
+            synapses = synapse.create_synapses(target_sites, predicted_syns,
+                                               scores=scores)
 
         srcroi = request[self.srcpoints].roi
 
@@ -173,6 +184,9 @@ class ExtractSynapses(BatchFilter):
                                           mode='r+')
             dag_db.write_nodes(nodes)
             dag_db.write_edges(edges)
+
+
+
 
         # Bring into gunpowder format
         srcpoints = {}
@@ -215,18 +229,18 @@ class ExtractSynapses(BatchFilter):
         nodes = []
         edges = []
         for synapse in synapses:
-            pre_node_inside = True
+            post_node_inside = True
             if roi is not None:
-                pre_node_inside = roi.contains(synapse.location_pre)
+                post_node_inside = roi.contains(synapse.location_post)
 
-            if pre_node_inside:
-                id_bump = cantor_number(synapse.location_pre)
-                node_pre = self.__from_synapse_to_node(synapse, id=id_bump,
+            if post_node_inside:
+                id_bump = cantor_number(synapse.location_post)
+                node_pre = self.__from_synapse_to_node(synapse, id=-id_bump,
                                                        pre=True)
-                node_post = self.__from_synapse_to_node(synapse, id=-id_bump,
+                node_post = self.__from_synapse_to_node(synapse, id=id_bump,
                                                         pre=False)
-                edge = {'source': id_bump}
-                edge['target'] = -id_bump
+                edge = {'source': -id_bump}
+                edge['target'] = id_bump
                 edges.append(edge)
                 nodes.extend([node_pre, node_post])
         return nodes, edges
