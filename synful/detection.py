@@ -230,7 +230,7 @@ def find_locations(probmap, parameters,
                                                      voxel_size,
                                                      score_vol=probmap,
                                                      score_type=parameters.score_type)
-
+    pred_locs = [loc.astype(np.int64) for loc in pred_locs]
     return pred_locs, scorelist
 
 
@@ -270,4 +270,5 @@ def find_targets(source_locs, dirvectors,
         logger.debug('Average distance of synapses %0.2f' % np.mean(distances))
     logger.debug('Removed {} synapses because distance '
                  'smaller than {}'.format(len(to_remove), min_dist))
+    target_locs = [loc.astype(np.int64) for loc in target_locs]
     return target_locs
