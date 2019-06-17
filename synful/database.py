@@ -313,7 +313,7 @@ class DAGDatabase(object):
                 [
                     ('id', ASCENDING)
                 ],
-                name='id')
+                name='id', unique=True)
             self.nodes.create_index(
                 [
                     ('score', ASCENDING)
