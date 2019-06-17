@@ -185,9 +185,6 @@ class ExtractSynapses(BatchFilter):
             dag_db.write_nodes(nodes)
             dag_db.write_edges(edges)
 
-
-
-
         # Bring into gunpowder format
         srcpoints = {}
         trgpoints = {}
@@ -235,9 +232,11 @@ class ExtractSynapses(BatchFilter):
 
             if post_node_inside:
                 id_bump = cantor_number(synapse.location_post)
-                node_pre = self.__from_synapse_to_node(synapse, id=str(-id_bump),
+                node_pre = self.__from_synapse_to_node(synapse,
+                                                       id=str(-id_bump),
                                                        pre=True)
-                node_post = self.__from_synapse_to_node(synapse, id=str(id_bump),
+                node_post = self.__from_synapse_to_node(synapse,
+                                                        id=str(id_bump),
                                                         pre=False)
                 edge = {'source': str(-id_bump)}
                 edge['target'] = str(id_bump)
