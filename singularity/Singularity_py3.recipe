@@ -45,6 +45,7 @@ From: ubuntu:18.04
     conda update -q conda
     conda info -a
     conda install python=3.6
+    conda install pandas
 
     # install tensorflow
 
