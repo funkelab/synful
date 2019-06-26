@@ -74,7 +74,7 @@ class TestExtractSynapses(unittest.TestCase):
 
         voxel_size = gp.Coordinate((10, 10, 10))
         size = ((200, 200, 200))
-        context = 120
+        context = 40
         shape = gp.Coordinate(size) / voxel_size
         m_predar = np.zeros(shape, dtype=np.float32)
         insidepoint = gp.Coordinate((10, 10, 10))
@@ -123,7 +123,7 @@ class TestExtractSynapses(unittest.TestCase):
         size = ((200, 200, 200))
         # Check whether the score of the entire cube is measured, although
         # cube of borderpoint partially outside request ROI.
-        context = 120
+        context = 40
         shape = gp.Coordinate(size) / voxel_size
         m_predar = np.zeros(shape, dtype=np.float32)
         outsidepoint = gp.Coordinate((13, 13, 13))
