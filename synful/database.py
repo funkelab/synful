@@ -96,7 +96,7 @@ class NeuronDatabase(object):
                 'y': int(float(n['position'][1])),
                 'x': int(float(n['position'][2])),
                 'neuron_id': n['neuron_id'],
-                'id': n['id']}
+                'id': int(n['id'])}
             if 'type' in n:
                 node_dic.update({'type': n['type']})
             nodes_db.append(node_dic)
@@ -363,7 +363,9 @@ class DAGDatabase(object):
                 # Direct str (if flaot) to int conversion throws error
                 'y': int(float(n['position'][1])),
                 'x': int(float(n['position'][2])),
+                'id': int(n['id'])
             }
+
             node_dic.update({key: n[key] for key in node_keys})
             nodes_db.append(node_dic)
 
