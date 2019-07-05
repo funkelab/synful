@@ -74,7 +74,11 @@ class ExtractSynapses(BatchFilter):
         self.srcpoints = srcpoints
         self.trgpoints = trgpoints
         self.settings = settings
-        self.context = [context]
+        if type(context) == tuple:
+            context = list(context)
+        if not type(context) == list:
+            context = [context]
+        self.context = context
         self.db_name = db_name
         self.db_host = db_host
         self.db_col_name = db_col_name
