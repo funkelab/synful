@@ -258,13 +258,13 @@ class ExtractSynapses(BatchFilter):
             if post_node_inside:
                 id_bump = cantor_number(synapse.location_post)
                 node_pre = self.__from_synapse_to_node(synapse,
-                                                       id=str(-id_bump),
+                                                       id=int(-id_bump),
                                                        pre=True)
                 node_post = self.__from_synapse_to_node(synapse,
-                                                        id=str(id_bump),
+                                                        id=int(id_bump),
                                                         pre=False)
-                edge = {'source': str(-id_bump)}
-                edge['target'] = str(id_bump)
+                edge = {'source': int(-id_bump)}
+                edge['target'] = int(id_bump)
                 edges.append(edge)
                 nodes.extend([node_pre, node_post])
         return nodes, edges
