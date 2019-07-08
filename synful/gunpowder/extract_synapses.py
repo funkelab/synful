@@ -181,11 +181,13 @@ class ExtractSynapses(BatchFilter):
         if self.db_name is not None and self.db_host is not None:
             db_col_name = 'syn' if self.db_col_name is None else self.db_col_name
             nodes, edges = self.__from_synapses_to_nodes_and_edges(synapses,
+                                                                   voxel_size=dchannel.spec.voxel_size,
                                                                    roi=srcroi)
 
             dag_db = database.DAGDatabase(self.db_name, self.db_host,
                                           db_col_name=db_col_name,
                                           mode='r+')
+
             dag_db.write_nodes(nodes)
             dag_db.write_edges(edges)
 
@@ -226,7 +228,7 @@ class ExtractSynapses(BatchFilter):
 
         return node
 
-    def __from_synapses_to_nodes_and_edges(self, synapses, roi=None):
+    def __from_synapses_to_nodes_and_edges(self, synapses, voxel_size, roi=None):
         nodes = []
         edges = []
         for synapse in synapses:
@@ -235,7 +237,7 @@ class ExtractSynapses(BatchFilter):
                 post_node_inside = roi.contains(synapse.location_post)
 
             if post_node_inside:
-                id_bump = cantor_number(synapse.location_post)
+                id_bump = cantor_number(synapse.location_post/voxel_size)
                 node_pre = self.__from_synapse_to_node(synapse,
                                                        id=int(-id_bump),
                                                        pre=True)
