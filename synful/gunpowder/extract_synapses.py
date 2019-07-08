@@ -58,6 +58,10 @@ class ExtractSynapses(BatchFilter):
             presynaptic partner. (Only relevant for writing synapses out
             to a database.)
 
+        overwrite (``bool``):
+            Defaults to true. If set to true, synapse in requested ROI are
+            first removed from mongodb.
+
     '''
 
     def __init__(self, m_array, d_array, srcpoints, trgpoints,
@@ -83,6 +87,7 @@ class ExtractSynapses(BatchFilter):
         self.db_host = db_host
         self.db_col_name = db_col_name
         self.pre_to_post = False
+        self.overwrite = True
 
     def setup(self):
 
@@ -187,6 +192,8 @@ class ExtractSynapses(BatchFilter):
             dag_db = database.DAGDatabase(self.db_name, self.db_host,
                                           db_col_name=db_col_name,
                                           mode='r+')
+            if self.overwrite:
+                dag_db.remove_in_roi(srcroi)
 
             dag_db.write_nodes(nodes)
             dag_db.write_edges(edges)

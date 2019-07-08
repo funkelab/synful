@@ -499,6 +499,26 @@ class DAGDatabase(object):
 
         return edges
 
+    def remove_in_roi(self, roi):
+        ''' Removes edges and nodes inside roi.
+        Args:
+            roi (``daisy.Roi``): Source nodes in given roi, corresponding edges
+            and their target nodes are removed from database.
+        '''
+
+        edges = self.read_edges(roi)
+        nodes = self.read_nodes_based_on_edges(edges)
+        edge_ids = [edge['_id'] for edge in edges]
+        res_edge = self.edges.delete_many({'_id':{ '$in': edge_ids}})
+        logger.debug('deleted {} edges'.format(res_edge.deleted_count))
+
+        node_ids = [node['id'] for node in nodes]
+        res_node = self.nodes.delete_many({'id':{ '$in': node_ids}})
+        logger.debug('deleted {} nodes'.format(res_node.deleted_count))
+
+
+
+
 
 class ResultDatabase(object):
     """" Result pymongo database interface"""
