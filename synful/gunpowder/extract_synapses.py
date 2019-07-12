@@ -66,7 +66,8 @@ class ExtractSynapses(BatchFilter):
 
     def __init__(self, m_array, d_array, srcpoints, trgpoints,
                  settings=None, context=120,
-                 db_name=None, db_host=None, db_col_name=None):
+                 db_name=None, db_host=None, db_col_name=None,
+                 overwrite=True):
         if db_name is not None or db_host is not None:
             if db_host is None or db_name is None:
                 logger.warning(
@@ -87,7 +88,7 @@ class ExtractSynapses(BatchFilter):
         self.db_host = db_host
         self.db_col_name = db_col_name
         self.pre_to_post = False
-        self.overwrite = True
+        self.overwrite = overwrite
 
     def setup(self):
 
@@ -144,6 +145,7 @@ class ExtractSynapses(BatchFilter):
         mchannel = batch[self.m_array]
         dchannel = batch[self.d_array]
         start_time = time.time()
+
         predicted_syns, scores = detection.find_locations(mchannel.data,
                                                           self.settings,
                                                           mchannel.spec.voxel_size)
