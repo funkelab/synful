@@ -77,7 +77,7 @@ From: ubuntu:18.04
 
     GUNPOWDER_ROOT=/src/gunpowder
     GUNPOWDER_REPOSITORY=https://github.com/funkey/gunpowder.git
-    GUNPOWDER_REVISION=dc139498cf8d741095f6e9a92ea43e1a7e1a10ad
+    GUNPOWDER_REVISION=307a64ad027d7c606ec4add2e565e404c858828b
 
     cd ${GUNPOWDER_ROOT}
     git clone ${GUNPOWDER_REPOSITORY} . && \
@@ -88,7 +88,7 @@ From: ubuntu:18.04
 
     DAISY_ROOT=/src/daisy
     DAISY_REPOSITORY=https://github.com/funkelab/daisy
-    DAISY_REVISION=41130e58582ae05d01d26261786de0cbafaa6482
+    DAISY_REVISION=0d5d38a17d7250979284ace369bd71b89d004c97
 
     cd ${DAISY_ROOT}
     git clone ${DAISY_REPOSITORY} . && \
