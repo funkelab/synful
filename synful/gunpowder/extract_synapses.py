@@ -2,6 +2,7 @@ from __future__ import division
 
 import logging
 import time
+from pymongo import MongoClient
 
 import gunpowder as gp
 import numpy as np
@@ -58,16 +59,11 @@ class ExtractSynapses(BatchFilter):
             presynaptic partner. (Only relevant for writing synapses out
             to a database.)
 
-        overwrite (``bool``):
-            Defaults to true. If set to true, synapse in requested ROI are
-            first removed from mongodb.
-
     '''
 
     def __init__(self, m_array, d_array, srcpoints, trgpoints,
                  settings=None, context=120,
-                 db_name=None, db_host=None, db_col_name=None,
-                 overwrite=True):
+                 db_name=None, db_host=None, db_col_name=None):
         if db_name is not None or db_host is not None:
             if db_host is None or db_name is None:
                 logger.warning(
@@ -88,7 +84,6 @@ class ExtractSynapses(BatchFilter):
         self.db_host = db_host
         self.db_col_name = db_col_name
         self.pre_to_post = False
-        self.overwrite = overwrite
 
     def setup(self):
 
@@ -146,6 +141,27 @@ class ExtractSynapses(BatchFilter):
         dchannel = batch[self.d_array]
         start_time = time.time()
 
+        if self.db_name is not None and self.db_host is not None:
+            srcroi = request[self.srcpoints].roi
+            begin = srcroi.get_begin()
+            batch_id = cantor_number(begin/mchannel.spec.voxel_size)
+            cl = MongoClient(self.db_host)
+            b_status = cl[self.db_name]['blocks_status']
+            res = b_status.find_one({'batch_id': batch_id})
+            if res:
+                overwrite = True
+                res.update({'status': 2})  # 2 --> started, 1 --> complete
+                logging.debug('overwriting partially written block with '
+                             'batch id {}'.format(batch_id))
+            else:
+                overwrite = False
+                res = {
+                    'batch_id': batch_id,
+                    'status': 2
+                }
+                logging.debug('setting batch {} status to 2'.format(batch_id))
+            b_status.replace_one({'batch_id': batch_id}, res, upsert=True)
+
         predicted_syns, scores = detection.find_locations(mchannel.data,
                                                           self.settings,
                                                           mchannel.spec.voxel_size)
@@ -194,11 +210,15 @@ class ExtractSynapses(BatchFilter):
             dag_db = database.DAGDatabase(self.db_name, self.db_host,
                                           db_col_name=db_col_name,
                                           mode='r+')
-            if self.overwrite:
+            if overwrite:
                 dag_db.remove_in_roi(srcroi)
 
             dag_db.write_nodes(nodes)
             dag_db.write_edges(edges)
+
+            # Track end of block writing
+            b_status.replace_one({'batch_id': batch_id},
+                                 {'batch_id': batch_id, 'status': 1})
 
         # Bring into gunpowder format
         srcpoints = {}
