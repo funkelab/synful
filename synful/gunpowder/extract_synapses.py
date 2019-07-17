@@ -1,16 +1,15 @@
 from __future__ import division
 
-import logging
-import time
-from pymongo import MongoClient
-
-import gunpowder as gp
-import numpy as np
+from .. import detection, synapse, database
+from funlib.math import cantor_number
 from gunpowder import BatchFilter
 from gunpowder.contrib.points import PreSynPoint, PostSynPoint
-from funlib.math import cantor_number
-
-from .. import detection, synapse, database
+from pymongo import MongoClient
+import gunpowder as gp
+import logging
+import numpy as np
+import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -36,20 +35,15 @@ class ExtractSynapses(BatchFilter):
         points (:class:``PointsKey``):
             The key of the postsynaptic points to create.
 
+        out_dir (``string``):
+            The directory to store the extracted synapses in.
+
         settings (:class:``SynapseExtractionParameters``):
             Which settings to use to extract synapses.
 
         db_name (``string``):
-            If db_name and db_host provided, synapses are written out into
-            database. Only those synapses are written out, where the postsynaptic
-            site is contained in output ROI (the location of the presynaptic
-            site does not matter).
-
         db_host (``string``):
-            Database host.
-
-        db_col_name (``string``):
-            Name of the mongodb collection, that the synapses are written to.
+            Database name and host to store block statistics.
 
         pre_to_post (``bool``):
             If set to True, it is assumed that m_array is indicating the
@@ -58,12 +52,19 @@ class ExtractSynapses(BatchFilter):
             indicates postsynaptic location, and d_array the direction to the
             presynaptic partner. (Only relevant for writing synapses out
             to a database.)
-
     '''
 
-    def __init__(self, m_array, d_array, srcpoints, trgpoints,
-                 settings=None, context=120,
-                 db_name=None, db_host=None, db_col_name=None):
+    def __init__(
+            self,
+            m_array,
+            d_array,
+            srcpoints,
+            trgpoints,
+            out_dir,
+            settings=None,
+            context=120,
+            db_name=None,
+            db_host=None):
         if db_name is not None or db_host is not None:
             if db_host is None or db_name is None:
                 logger.warning(
@@ -74,6 +75,7 @@ class ExtractSynapses(BatchFilter):
         self.d_array = d_array
         self.srcpoints = srcpoints
         self.trgpoints = trgpoints
+        self.out_dir = out_dir
         self.settings = settings
         if type(context) == tuple:
             context = list(context)
@@ -82,7 +84,6 @@ class ExtractSynapses(BatchFilter):
         self.context = context
         self.db_name = db_name
         self.db_host = db_host
-        self.db_col_name = db_col_name
         self.pre_to_post = False
 
     def setup(self):
@@ -201,80 +202,88 @@ class ExtractSynapses(BatchFilter):
 
         srcroi = request[self.srcpoints].roi
 
-        if self.db_name is not None and self.db_host is not None:
-            db_col_name = 'syn' if self.db_col_name is None else self.db_col_name
-            nodes, edges = self.__from_synapses_to_nodes_and_edges(synapses,
-                                                                   voxel_size=dchannel.spec.voxel_size,
-                                                                   roi=srcroi)
+        ids, positions, scores = self.__create_node_arrays(
+            synapses,
+            voxel_size=dchannel.spec.voxel_size,
+            roi=srcroi)
 
-            dag_db = database.DAGDatabase(self.db_name, self.db_host,
-                                          db_col_name=db_col_name,
-                                          mode='r+')
-            if overwrite:
-                dag_db.remove_in_roi(srcroi)
-
-            dag_db.write_nodes(nodes)
-            dag_db.write_edges(edges)
-
-            # Track end of block writing
-            b_status.replace_one({'batch_id': batch_id},
-                                 {'batch_id': batch_id, 'status': 1})
+        self.__store_node_arrays(
+            self.out_dir,
+            ids,
+            positions,
+            scores,
+            srcroi)
 
         # Bring into gunpowder format
         srcpoints = {}
         trgpoints = {}
-        syn_id = 0
-        for syn in synapses:
-            loc = gp.Coordinate(syn.location_pre)
-            if srcroi.contains(syn.location_pre) and srcroi.contains(
-                    syn.location_post):  # TODO: currently, gunpowder complains
-                # about points being outside ROI, thus can only provide synapses
-                # where pre and point are inside ROI
-                loc_index = syn_id * 2
-                syn_point = PreSynPoint(location=loc,
-                                        location_id=loc_index,
-                                        synapse_id=syn_id,
-                                        partner_ids=[loc_index + 1],
-                                        props={'score': syn.score})
-                srcpoints[loc_index] = syn_point
-                loc = gp.Coordinate(syn.location_post)
-                syn_point = PostSynPoint(location=loc,
-                                         location_id=loc_index + 1,
-                                         synapse_id=syn_id,
-                                         partner_ids=[loc_index],
-                                         props={'score': syn.score})
-                trgpoints[loc_index + 1] = syn_point
-                syn_id += 1
+        # syn_id = 0
+        # for syn in synapses:
+            # loc = gp.Coordinate(syn.location_pre)
+            # if srcroi.contains(syn.location_pre) and srcroi.contains(
+                    # syn.location_post):  # TODO: currently, gunpowder complains
+                # # about points being outside ROI, thus can only provide synapses
+                # # where pre and point are inside ROI
+                # loc_index = syn_id * 2
+                # syn_point = PreSynPoint(location=loc,
+                                        # location_id=loc_index,
+                                        # synapse_id=syn_id,
+                                        # partner_ids=[loc_index + 1],
+                                        # props={'score': syn.score})
+                # srcpoints[loc_index] = syn_point
+                # loc = gp.Coordinate(syn.location_post)
+                # syn_point = PostSynPoint(location=loc,
+                                         # location_id=loc_index + 1,
+                                         # synapse_id=syn_id,
+                                         # partner_ids=[loc_index],
+                                         # props={'score': syn.score})
+                # trgpoints[loc_index + 1] = syn_point
+                # syn_id += 1
         return srcpoints, trgpoints
 
-    def __from_synapse_to_node(self, synapse, id=None, pre=True):
-        node = {'id': id}
-        if pre:
-            node['position'] = synapse.location_pre
-        else:
-            node['position'] = synapse.location_post
-        node['score'] = np.double(synapse.score)
+    def __create_node_arrays(self, synapses, voxel_size, roi=None):
 
-        return node
+        # filter synapses
+        if roi is not None:
+            synapses = [
+                synapse
+                for synapse in synapses
+                if roi.contains(synapse.location_post)
+            ]
 
-    def __from_synapses_to_nodes_and_edges(self, synapses, voxel_size, roi=None):
-        nodes = []
-        edges = []
-        for synapse in synapses:
-            post_node_inside = True
-            if roi is not None:
-                post_node_inside = roi.contains(synapse.location_post)
+        num_synapses = len(synapses)
 
-            if post_node_inside:
-                id_bump = cantor_number(synapse.location_post/voxel_size)
-                node_pre = self.__from_synapse_to_node(synapse,
-                                                       id=int(-id_bump),
-                                                       pre=True)
-                node_post = self.__from_synapse_to_node(synapse,
-                                                        id=int(id_bump),
-                                                        pre=False)
-                edge = {'target': int(-id_bump)}
-                edge['source'] = int(id_bump)
-                edges.append(edge)
-                nodes.extend([node_pre, node_post])
-        return nodes, edges
+        ids = np.zeros((num_synapses,), dtype=np.uint64)
+        positions = np.zeros((num_synapses, 2, 3), dtype=np.int32)
+        scores = np.zeros((num_synapses,), dtype=np.float32)
+
+        for i, synapse in enumerate(synapses):
+
+            synapse_id = cantor_number(synapse.location_post/voxel_size)
+
+            ids[i] = synapse_id
+            positions[i, 0] = synapse.location_pre
+            positions[i, 1] = synapse.location_post
+            scores[i] = synapse.score
+
+        return ids, positions, scores
+
+    def __store_node_arrays(self, out_dir, ids, positions, scores, block_roi):
+
+        block_offset = block_roi.get_offset()
+        block_dir = os.path.join(
+            out_dir,
+            str(block_offset[0]),
+            str(block_offset[1]))
+        block_path = os.path.join(
+            block_dir,
+            str(block_offset[2]) + '.npz')
+
+        if not os.path.exists(block_dir):
+            os.makedirs(block_dir, exist_ok=True)
+
+        np.savez(
+            block_path,
+            ids=ids,
+            positions=positions,
+            scores=scores)
