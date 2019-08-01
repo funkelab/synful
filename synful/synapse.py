@@ -1,4 +1,9 @@
+import glob
 import logging
+import os
+from itertools import product, starmap
+
+import daisy
 import h5py
 import numpy as np
 
@@ -51,6 +56,73 @@ def create_synapses(sources, targets, scores=None):
         counter += 1
     return synapses
 
+
+def __ndrange(start, stop=None, step=None):
+    if stop is None:
+        stop = start
+        start = (0,)*len(stop)
+
+    if step is None:
+        step = (1,)*len(stop)
+
+    assert len(start) == len(stop) == len(step)
+
+    for index in product(*starmap(range, zip(start, stop, step))):
+        yield index
+
+
+def __get_chunk_size(directory):
+    offsets = [np.int64(f.name) for f in os.scandir(directory) if f.is_dir()]
+    offsets.sort()
+    zchunksize = offsets[1]
+
+    offsets = [np.int64(f.name) for f in
+               os.scandir(os.path.join(directory, '0')) if f.is_dir()]
+    offsets.sort()
+    ychunksize = offsets[1]
+
+    offsets = glob.glob(os.path.join(directory, '0', '0', '*.npz'))
+    offsets = [np.int64(os.path.splitext(os.path.basename(f))[0]) for f in
+               offsets]
+    offsets.sort()
+    xchunksize = offsets[1]
+
+    return (zchunksize, ychunksize, xchunksize)
+
+
+def read_synapses_in_roi(directory, roi, chunk_size=None):
+    """ Reads synapses from a npz files stored in x, y, z dir structure.
+
+    Args:
+        directory (str): Input directory where synapses are stored
+        roi (daisy.Roi): Synapses are only read in this ROI.
+        chunk_size (tuple): Size of chunks / blocks. If not provided, it will
+        be tried to infer this value from the dir structure itself.
+
+    Returns:
+        synapses (list): Returns list of synapse.Synapse
+
+    """
+
+    if chunk_size is None:
+        chunk_size = __get_chunk_size(directory)
+    adjusted_roi = roi.snap_to_grid(chunk_size)
+    blocks = __ndrange(adjusted_roi.get_begin(), adjusted_roi.get_end(),
+                     chunk_size)
+    synapses = []
+    for z, y, x in blocks:
+        filename = os.path.join(directory, str(z), str(y), '{}.npz'.format(x))
+        locations = np.load(filename)['positions']
+        scores = np.load(filename)['scores']
+        ids = np.load(filename)['ids']
+        for ii, id in enumerate(ids):
+            syn = Synapse(id=id, score=scores[ii],
+                          location_pre=locations[ii, 0],
+                          location_post=locations[ii, 1])
+            if roi.contains(syn.location_post):
+                synapses.append(syn)
+
+    return synapses
 
 def write_synapses_into_cremiformat(synapses, filename, offset=None,
                                     overwrite=False):
