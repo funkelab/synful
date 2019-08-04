@@ -16,23 +16,23 @@ logger = logging.getLogger(__name__)
 
 class ExtractSynapses(BatchFilter):
     '''Extract synaptic partners from 2 prediction channels. One prediction map
-    indicates the location (m_channel), the second map (z_channel) indicates the
+    indicates the location (m_array), the second map (d_array) indicates the
     direction to its synaptic partner. Optionally, writes it to a database.
 
     Args:
 
-        array (:class:``ArrayKey``):
+        m_array (:class:``ArrayKey``):
             The key of the array to extract points from.
 
-        array (:class:``ArrayKey``):
+        d_array (:class:``ArrayKey``):
             The key of the array to extract vectors from.
 
-        points (:class:``PointsKey``):
+        srcpoints (:class:``PointsKey``):
             The key of the presynaptic points to create. Note, that only those
             synaptic partners will be in roi, where both pre and postsynaptic
             site are fully contained in ROI.
 
-        points (:class:``PointsKey``):
+        trgpoints (:class:``PointsKey``):
             The key of the postsynaptic points to create.
 
         out_dir (``string``):
@@ -40,6 +40,11 @@ class ExtractSynapses(BatchFilter):
 
         settings (:class:``SynapseExtractionParameters``):
             Which settings to use to extract synapses.
+
+        context (``list`` of ``int`` or ``int``):
+            List which defines padding of srcpoints ROI in world units. Synapses
+            are detected in this padded ROI, while only written out in original
+            srcpoints ROI.
 
         db_name (``string``):
         db_host (``string``):
