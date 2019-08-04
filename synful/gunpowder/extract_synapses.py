@@ -69,7 +69,8 @@ class ExtractSynapses(BatchFilter):
             settings=None,
             context=120,
             db_name=None,
-            db_host=None):
+            db_host=None,
+            pre_to_post=False):
         if db_name is not None or db_host is not None:
             if db_host is None or db_name is None:
                 logger.warning(
@@ -89,7 +90,7 @@ class ExtractSynapses(BatchFilter):
         self.context = context
         self.db_name = db_name
         self.db_host = db_host
-        self.pre_to_post = False
+        self.pre_to_post = pre_to_post
 
     def setup(self):
 
