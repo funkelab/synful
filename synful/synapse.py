@@ -1,11 +1,12 @@
+import copy
 import glob
 import logging
 import os
 from itertools import product, starmap
 
-import daisy
 import h5py
 import numpy as np
+from scipy.sparse.csgraph import csgraph_from_dense, connected_components
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,7 @@ def read_synapses_in_roi(directory, roi, chunk_size=None):
 
     return synapses
 
+
 def write_synapses_into_cremiformat(synapses, filename, offset=None,
                                     overwrite=False):
     id_nr, ids, locations, partners, types = 0, [], [], [], []
@@ -155,3 +157,85 @@ def write_synapses_into_cremiformat(synapses, filename, offset=None,
     h5_file.close()
     logger.debug('File written to {}'.format(filename))
 
+
+def __find_redundant_synapses(synapses, dist_threshold):
+    pair_to_syns = {}
+    for syn in synapses:
+        pair = (syn.id_segm_pre, syn.id_segm_post)
+        if pair in pair_to_syns:
+            pair_to_syns[pair].append(syn)
+        else:
+            pair_to_syns[pair] = [syn]
+
+    clusters = []
+    for pair, syns in pair_to_syns.items():
+        if len(syns) > 1:
+            # --> multiple synapses have same pre_id and post_id
+            clustered_syns = __find_cc_of_synapses(syns, dist_threshold)
+            if len(clustered_syns) > 0:
+                clusters.extend(clustered_syns)
+    return clusters
+
+
+def __find_cc_of_synapses(synapses, dist_threshold):
+    points = np.array([syn.location_post for syn in synapses])
+    dists = np.sqrt(
+        ((points.reshape(-1, 1, 3) - points.reshape(1, -1, 3)) ** 2).sum(
+            axis=2))
+    # it is a symmetric matrix, remove redundancy
+    dists *= np.tri(*dists.shape)
+
+    dists[dists > dist_threshold] = np.NaN
+    dists[dists == 0] = np.NaN
+    sparsematrix = csgraph_from_dense(dists, null_value=np.NAN)
+    num_cc, labels = connected_components(sparsematrix,
+                                                               directed=False)
+    clusters_of_indeces = []
+    for label in np.unique(labels):
+        clusters_of_indeces.append(list(np.where(labels == label)[0]))
+    clustered_synapses = []
+    for cluster in clusters_of_indeces:
+        if len(cluster) > 1:
+            cluster = [synapses[ind] for ind in cluster]
+            clustered_synapses.append(cluster)
+    return clustered_synapses
+
+
+def cluster_synapses(synapses, dist_threshold):
+    """ Match synapses with same seg ids in close euclidean distance.
+
+    Args:
+        synapses (list)): List of synapse.Synapse.
+        dist_threshold (float): Threshold for finding connected components.
+
+    Returns:
+        synapses (list): Returns list of synapse.Synapse with redundant synapses
+        fused to single synapse.
+
+        ids (list): Returns a  list of synapse ids, that have been removed from list
+
+    """
+    clusters = __find_redundant_synapses(synapses, dist_threshold)
+    id_to_synapses = {}
+    for syn in synapses:
+        id_to_synapses[syn.id] = syn
+    all_removed_ids = []
+    for cluster in clusters:
+        # TODO: To find new location for fused synapse,
+        #         currently the mean is used. However, it is not guaranteed,
+        #         that the underlying segmentation id changes.
+        new_loc_post = np.mean(np.array([syn.location_post for syn in cluster]),
+                               axis=0)
+        new_loc_pre = np.mean(np.array([syn.location_pre for syn in cluster]),
+                              axis=0)
+        new_id = cluster[0].id
+        ids_to_remove = [syn.id for syn in cluster[1:]]
+        all_removed_ids.extend(ids_to_remove)
+        new_syn = copy.copy(cluster[0])
+        new_syn.location_post = new_loc_post
+        new_syn.location_pre = new_loc_pre
+        id_to_synapses[new_id] = new_syn
+
+        for id in ids_to_remove:
+            del id_to_synapses[id]
+    return list(id_to_synapses.values()), all_removed_ids
