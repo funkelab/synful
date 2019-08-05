@@ -68,8 +68,10 @@ def __ndrange(start, stop=None, step=None):
 
     assert len(start) == len(stop) == len(step)
 
+    indeces = []
     for index in product(*starmap(range, zip(start, stop, step))):
-        yield index
+        indeces.append(index)
+    return indeces
 
 
 def __get_chunk_size(directory):
@@ -110,18 +112,24 @@ def read_synapses_in_roi(directory, roi, chunk_size=None):
     adjusted_roi = roi.snap_to_grid(chunk_size)
     blocks = __ndrange(adjusted_roi.get_begin(), adjusted_roi.get_end(),
                      chunk_size)
+    logger.info('loading from {} block(s)'.format(len(blocks)))
     synapses = []
+    block_counter = 0
     for z, y, x in blocks:
         filename = os.path.join(directory, str(z), str(y), '{}.npz'.format(x))
-        locations = np.load(filename)['positions']
-        scores = np.load(filename)['scores']
-        ids = np.load(filename)['ids']
-        for ii, id in enumerate(ids):
-            syn = Synapse(id=id, score=scores[ii],
-                          location_pre=locations[ii, 0],
-                          location_post=locations[ii, 1])
-            if roi.contains(syn.location_post):
-                synapses.append(syn)
+        block_counter += 1
+        if block_counter%5000==0:
+            logger.debug('loading {}/{}, number of synapses: {}'.format(block_counter, len(blocks), len(synapses)))
+        if os.path.exists(filename):
+            locations = np.load(filename)['positions']
+            scores = np.load(filename)['scores']
+            ids = np.load(filename)['ids']
+            for ii, id in enumerate(ids):
+                syn = Synapse(id=id, score=scores[ii],
+                              location_pre=locations[ii, 0],
+                              location_post=locations[ii, 1])
+                if roi.contains(syn.location_post):
+                    synapses.append(syn)
 
     return synapses
 
