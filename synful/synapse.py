@@ -93,7 +93,7 @@ def __get_chunk_size(directory):
     return (zchunksize, ychunksize, xchunksize)
 
 
-def read_synapses_in_roi(directory, roi, chunk_size=None):
+def read_synapses_in_roi(directory, roi, chunk_size=None, score_thr=-1):
     """ Reads synapses from a npz files stored in x, y, z dir structure.
 
     Args:
@@ -128,7 +128,7 @@ def read_synapses_in_roi(directory, roi, chunk_size=None):
                 syn = Synapse(id=id, score=scores[ii],
                               location_pre=locations[ii, 0],
                               location_post=locations[ii, 1])
-                if roi.contains(syn.location_post):
+                if roi.contains(syn.location_post) and syn.score > score_thr:
                     synapses.append(syn)
 
     return synapses
@@ -227,6 +227,7 @@ def cluster_synapses(synapses, dist_threshold):
     id_to_synapses = {}
     for syn in synapses:
         id_to_synapses[syn.id] = syn
+
     all_removed_ids = []
     for cluster in clusters:
         # TODO: To find new location for fused synapse,
@@ -246,4 +247,5 @@ def cluster_synapses(synapses, dist_threshold):
 
         for id in ids_to_remove:
             del id_to_synapses[id]
+
     return list(id_to_synapses.values()), all_removed_ids
