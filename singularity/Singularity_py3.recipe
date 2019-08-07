@@ -20,7 +20,7 @@ From: ubuntu:18.04
 
 %labels
 
-    Version 0.7 # synful version:  8d5a4714ac9289e87d8ddecfc4b5a47f9694f7cc
+    Version 0.9 # synful version: d5bd5fcaea23199c8398618668e3a3b8bc9cc052
 
 %post
 
@@ -123,6 +123,7 @@ From: ubuntu:18.04
     pip install mahotas
     pip install pymongo
     pip install neuroglancer
+    pip install google-auth
 
 
 
