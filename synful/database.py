@@ -517,7 +517,117 @@ class DAGDatabase(object):
         logger.debug('deleted {} nodes'.format(res_node.deleted_count))
 
 
+class SynapseDatabase(object):
+    """" Database interface for synapses. One document corresponds to one synapse"""
 
+    def __init__(self, db_name, db_host='localhost', db_col_name='default',
+                 mode='r'):
+
+        self.db_name = db_name
+        self.db_host = db_host
+        self.db_col = db_col_name
+        self.mode = mode
+        self.client = MongoClient(host=db_host)
+        self.database = self.client[db_name]
+
+        if mode == 'w':
+            synapse_col_name = db_col_name + '.synapses'
+            self.database.drop_collection(synapse_col_name)
+            logger.debug('overwriting collection %s' % db_col_name)
+
+        self.collection = self.database[db_col_name]
+        self.synapses = self.collection['synapses']
+
+        if mode == 'w':
+            self.synapses.create_index(
+                [
+                    ('pre_z', ASCENDING),
+                    ('pre_y', ASCENDING),
+                    ('pre_x', ASCENDING),
+                ],
+                name='pre_position')
+
+            self.synapses.create_index(
+                [
+                    ('post_z', ASCENDING),
+                    ('post_y', ASCENDING),
+                    ('post_x', ASCENDING)
+                ],
+                name='post_position')
+
+            self.synapses.create_index(
+                [
+                    ('pre_seg_id', ASCENDING),
+                    ('post_seg_id', ASCENDING),
+                ],
+                name='seg_ids')
+
+            self.synapses.create_index(
+                [
+                    ('id', ASCENDING)
+                ],
+                name='id', unique=True)
+            self.synapses.create_index(
+                [
+                    ('score', ASCENDING)
+                ],
+                name='score')
+
+    def write_synapses(self, synapses):
+
+        if self.mode == 'r':
+            raise RuntimeError("trying to write to read-only DB")
+
+        if len(synapses) == 0:
+            logger.debug("No edges to write.")
+            return
+
+        db_list = []
+        for syn in synapses:
+            syn_dic = {
+                'id': int(syn.id),
+                'pre_z': int(syn.location_pre[0]),
+                'pre_y': int(syn.location_pre[1]),
+                'pre_x': int(syn.location_pre[2]),
+                'post_z': int(syn.location_post[0]),
+                'post_y': int(syn.location_post[1]),
+                'post_x': int(syn.location_post[2]),
+            }
+            if syn.score is not None:
+                syn_dic['score'] = float(syn.score)
+            if syn.id_segm_pre is not None:
+                syn_dic['pre_seg_id'] = int(syn.id_segm_pre)
+            if syn.id_segm_post is not None:
+                syn_dic['post_seg_id'] = int(syn.id_segm_post)
+            db_list.append(syn_dic)
+
+        self.synapses.insert_many(db_list)
+        logger.debug("Insert %d synapses" % len(synapses))
+
+    def read_synapses(self, roi=None):
+        """ Read synapses from database.
+
+        Args:
+            roi (``daisy.Roi``, optional):
+                If given, restrict reading synapses to ROI. If not given, all synapses are read.
+        Returns:
+            ``list`` of ``dic``: List of synapses in dictionary format.
+        """
+
+        if roi is None:
+            logger.debug("No roi provided, querying all synapses in database")
+            synapses_dic = self.synapses.find()
+        else:
+            logger.debug("Querying synapses in %s", roi)
+            bz, by, bx = roi.get_begin()
+            ez, ey, ex = roi.get_end()
+            synapses_dic = self.synapses.find(
+                {
+                    'post_z': {'$gte': bz, '$lt': ez},
+                    'post_y': {'$gte': by, '$lt': ey},
+                    'post_x': {'$gte': bx, '$lt': ex}
+                })
+        return synapses_dic
 
 
 class ResultDatabase(object):
