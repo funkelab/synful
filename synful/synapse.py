@@ -36,6 +36,7 @@ class Synapse(object):
         return output_str
 
 
+
 def create_synapses(sources, targets, scores=None):
     """Creates a list of synapses.
 
@@ -226,6 +227,7 @@ def cluster_synapses(synapses, dist_threshold):
     clusters = __find_redundant_synapses(synapses, dist_threshold)
     id_to_synapses = {}
     for syn in synapses:
+        assert syn.id is not None
         id_to_synapses[syn.id] = syn
 
     all_removed_ids = []
