@@ -113,7 +113,7 @@ def read_synapses_in_roi(directory, roi, chunk_size=None, score_thr=-1):
     adjusted_roi = roi.snap_to_grid(chunk_size)
     blocks = __ndrange(adjusted_roi.get_begin(), adjusted_roi.get_end(),
                      chunk_size)
-    logger.info('loading from {} block(s)'.format(len(blocks)))
+    logger.debug('loading from {} block(s)'.format(len(blocks)))
     synapses = []
     block_counter = 0
     for z, y, x in blocks:
