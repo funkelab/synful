@@ -564,6 +564,13 @@ class SynapseDatabase(object):
 
             self.synapses.create_index(
                 [
+                    ('pre_skel_id', ASCENDING),
+                    ('post_skel_id', ASCENDING),
+                ],
+                name='skel_ids')
+
+            self.synapses.create_index(
+                [
                     ('id', ASCENDING)
                 ],
                 name='id', unique=True)
@@ -599,6 +606,10 @@ class SynapseDatabase(object):
                 syn_dic['pre_seg_id'] = int(syn.id_segm_pre)
             if syn.id_segm_post is not None:
                 syn_dic['post_seg_id'] = int(syn.id_segm_post)
+            if syn.id_skel_pre is not None:
+                syn_dic['pre_skel_id'] = int(syn.id_skel_pre)
+            if syn.id_skel_post is not None:
+                syn_dic['post_skel_id'] = int(syn.id_skel_post)
             db_list.append(syn_dic)
 
         self.synapses.insert_many(db_list)
