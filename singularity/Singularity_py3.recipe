@@ -20,7 +20,7 @@ From: ubuntu:18.04
 
 %labels
 
-    Version 0.9 # synful version: d5bd5fcaea23199c8398618668e3a3b8bc9cc052
+    Version 0.10 # synful version: 1223ba4cdd3cd2e098f3323c14ad695fb5b93967
 
 %post
 
