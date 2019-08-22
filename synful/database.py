@@ -1,4 +1,5 @@
 import logging
+import json
 
 from pymongo import MongoClient, ASCENDING, TEXT
 
@@ -520,9 +521,16 @@ class DAGDatabase(object):
 class SynapseDatabase(object):
     """" Database interface for synapses. One document corresponds to one synapse"""
 
-    def __init__(self, db_name, db_host='localhost', db_col_name='default',
+    def __init__(self, db_name=None, db_host='localhost', db_col_name='default',
+                 db_json=None,
                  mode='r'):
-
+        if db_json is not None:
+            assert db_name is None, 'both db_name and db_json provided, unclear what to do'
+            with open(db_json) as f:
+                db_config = json.load(f)
+            db_name = db_config['db_name']
+            db_host = db_config['db_host']
+            db_col_name = db_config['db_col']
         self.db_name = db_name
         self.db_host = db_host
         self.db_col = db_col_name
