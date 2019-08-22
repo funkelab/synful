@@ -35,6 +35,24 @@ class Synapse(object):
             str(self.id_skel_post))
         return output_str
 
+def create_synapses_from_db(synapses_dic):
+    synapses = []
+    for syn_dic in synapses_dic:
+        syn = Synapse(
+            id=syn_dic['id'],
+            location_pre=np.array(
+                (syn_dic['pre_z'], syn_dic['pre_y'], syn_dic['pre_x'])),
+            location_post=np.array(
+                (syn_dic['post_z'], syn_dic['post_y'], syn_dic['post_x'])),
+        )
+        syn.id_skel_pre = syn_dic.get('pre_skel_id', None)
+        syn.id_skel_post = syn_dic.get('post_skel_id', None)
+        syn.id_segm_pre = syn_dic.get('pre_seg_id', None)
+        syn.id_segm_post = syn_dic.get('post_seg_id', None)
+        syn.score = syn_dic.get('score', None)
+
+        synapses.append(syn)
+    return synapses
 
 
 def create_synapses(sources, targets, scores=None):
