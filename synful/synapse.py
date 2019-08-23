@@ -228,7 +228,7 @@ def __find_cc_of_synapses(synapses, dist_threshold):
     return clustered_synapses
 
 
-def cluster_synapses(synapses, dist_threshold):
+def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean'):
     """ Match synapses with same seg ids in close euclidean distance.
 
     Args:
@@ -250,22 +250,32 @@ def cluster_synapses(synapses, dist_threshold):
 
     all_removed_ids = []
     for cluster in clusters:
-        # TODO: To find new location for fused synapse,
-        #         currently the mean is used. However, it is not guaranteed,
-        #         that the underlying segmentation id changes.
-        new_loc_post = np.mean(np.array([syn.location_post for syn in cluster]),
-                               axis=0)
-        new_loc_pre = np.mean(np.array([syn.location_pre for syn in cluster]),
-                              axis=0)
-        new_id = cluster[0].id
-        ids_to_remove = [syn.id for syn in cluster[1:]]
-        all_removed_ids.extend(ids_to_remove)
-        new_syn = copy.copy(cluster[0])
-        new_syn.location_post = new_loc_post
-        new_syn.location_pre = new_loc_pre
-        id_to_synapses[new_id] = new_syn
+        if fuse_strategy == 'mean':
+            logger.debug('Fuse_strategy mean chosen, not guaranteed that '
+                         'underlying connectivity stays the same')
+            new_loc_post = np.mean(np.array([syn.location_post for syn in cluster]),
+                                   axis=0)
+            new_loc_pre = np.mean(np.array([syn.location_pre for syn in cluster]),
+                                  axis=0)
+            new_id = cluster[0].id
+            ids_to_remove = [syn.id for syn in cluster[1:]]
+            all_removed_ids.extend(ids_to_remove)
+            new_syn = copy.copy(cluster[0])
+            new_syn.location_post = new_loc_post
+            new_syn.location_pre = new_loc_pre
+            id_to_synapses[new_id] = new_syn
+        elif fuse_strategy == 'max_score':
+            scores = [syn.score for syn in cluster]
+            max_index = np.argmax(scores)
+            print(scores, scores[max_index])
+            ids_to_remove = [syn.id for syn in cluster]
+            del ids_to_remove[max_index]
+            all_removed_ids.extend(ids_to_remove)
+        else:
+            raise RuntimeError('fuse_strategy {} not known'.format(fuse_strategy))
 
         for id in ids_to_remove:
             del id_to_synapses[id]
+
 
     return list(id_to_synapses.values()), all_removed_ids
