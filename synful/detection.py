@@ -207,6 +207,7 @@ def find_locations(probmap, parameters,
         locs: list of locations in world units.
 
     """
+    voxel_size = np.array(voxel_size)
     if parameters.extract_type == 'cc':
         regions, pred_labels = __from_probmap_to_labels(probmap,
                                                         parameters.cc_threshold)
