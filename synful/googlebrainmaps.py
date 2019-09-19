@@ -63,3 +63,10 @@ def query_seg_ids(locations, token, volume_id):
 
     # Done!
     return values
+
+def query_seg_ids_batch(locations, token, volume_id, query_size=128):
+    all_ids = []
+    for i in range(0, len(locations), query_size):
+        ids = list(googlebrainmaps.query_seg_ids(np.array(locations[i:i + query_size]), token, volume_id))
+        all_ids.extend(ids)
+    return np.array(all_ids)
