@@ -268,7 +268,6 @@ def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean'):
         elif fuse_strategy == 'max_score':
             scores = [syn.score for syn in cluster]
             max_index = np.argmax(scores)
-            print(scores, scores[max_index])
             ids_to_remove = [syn.id for syn in cluster]
             del ids_to_remove[max_index]
             all_removed_ids.extend(ids_to_remove)
