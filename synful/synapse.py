@@ -7,6 +7,7 @@ from itertools import product, starmap
 import h5py
 import numpy as np
 from scipy.sparse.csgraph import csgraph_from_dense, connected_components
+import neuroglancer
 
 logger = logging.getLogger(__name__)
 
@@ -279,3 +280,65 @@ def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean'):
 
 
     return list(id_to_synapses.values()), all_removed_ids
+
+
+def visualize_synapses_in_neuroglancer(s, synapses, score_thr=-1, radius=30,
+                 show_ellipsoid_annotation=False, name='', color='#00ff00'):
+    pre_sites = []
+    post_sites = []
+    connectors = []
+    below_score = 0
+    neuro_id = 0
+    for syn in synapses:
+        if syn.score is None:
+            add_synapse = True
+        else:
+            add_synapse = syn.score > score_thr
+        if not add_synapse:
+            below_score += 1
+        else:
+            pre_site = np.flip(syn.location_pre)
+            post_site = np.flip(syn.location_post)
+            description = f"id: {syn.id}, pre_seg: {syn.id_segm_pre}, post_seg: {syn.id_segm_post}, score: {syn.score}"
+            pre_sites.append(neuroglancer.EllipsoidAnnotation(center=pre_site,
+                                                              radii=(
+                                                                  radius,
+                                                                  radius,
+                                                                  radius),
+                                                              id=neuro_id + 1))
+            post_sites.append(neuroglancer.EllipsoidAnnotation(center=post_site,
+                                                               radii=(
+                                                                   radius,
+                                                                   radius,
+                                                                   radius),
+                                                               id=neuro_id + 2))
+            connectors.append(
+                neuroglancer.LineAnnotation(point_a=pre_site, point_b=post_site,
+                                            id=neuro_id + 3,
+                                            description=description))
+            neuro_id += 3
+
+    s.layers['connectors_{}'.format(name)] = neuroglancer.AnnotationLayer(
+        voxel_size=(1, 1, 1),
+        filter_by_segmentation=False,
+        annotation_color=color,
+        annotations=connectors,
+    )
+    if show_ellipsoid_annotation:
+        s.layers['pre_sites'] = neuroglancer.AnnotationLayer(
+            voxel_size=(1, 1, 1),
+            filter_by_segmentation=False,
+            annotation_color='#00ff00',
+            annotations=pre_sites,
+        )
+        s.layers['post_sites'] = neuroglancer.AnnotationLayer(
+            voxel_size=(1, 1, 1),
+            filter_by_segmentation=False,
+            annotation_color='#ff00ff',
+            annotations=post_sites,
+        )
+    print(
+        'filtered out {}/{} of synapses'.format(below_score,
+                                                len(synapses)))
+    print('displaying {} synapses'.format(len(post_sites)))
+    return synapses
