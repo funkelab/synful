@@ -361,12 +361,12 @@ class EvaluateAnnotations():
         post_locations = [daisy.Coordinate(syn.location_post) for syn in
                           synapses]
         # Compute Bounding box for pre_locations
-        z_min, y_min, x_min = np.min(np.array(post_locations), axis=0)
-        z_max, y_max, x_max = np.min(np.array(post_locations), axis=0)
+        z_min, y_min, x_min = np.min(np.array(pre_locations), axis=0)
+        z_max, y_max, x_max = np.min(np.array(pre_locations), axis=0)
 
         roi_big = daisy.Roi((z_min, y_min, x_min),
                             (z_max - z_min, y_max - y_min, x_max - x_min))
-        roi_big = roi_big.union(roi_big)
+        roi_big = roi_big.union(roi_context)
 
 
         roi_big = roi_big.snap_to_grid((40, 4, 4))
