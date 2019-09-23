@@ -341,10 +341,18 @@ class EvaluateAnnotations():
         with open(self.seg_agglomeration_json) as f:
             seg_config = json.load(f)
 
+        # Get actual segmentation ROI
+        seg = daisy.open_ds(seg_config['fragments_file'], seg_config['fragments_dataset'])
+
         # This reads in all synapses, where postsynaptic site is in ROI, but
         # it is not guaranteed, that presynaptic site is also in ROI.
         synapses = synapse.read_synapses_in_roi(self.syn_dir,
                                                 roi_core)
+
+        # Make sure to only look at synapses that are inside segmentation ROI.
+        synapses = [syn for syn in synapses if seg.roi.contains(syn.location_pre)
+                    and seg.roi.contains(syn.location_post)]
+
         if len(synapses) == 0:
             logger.debug('no synapse in roi')
             return 0
@@ -358,8 +366,11 @@ class EvaluateAnnotations():
 
         roi_big = daisy.Roi((z_min, y_min, x_min),
                             (z_max - z_min, y_max - y_min, x_max - x_min))
-        roi_big = roi_big.union(roi_context)
+        roi_big = roi_big.union(roi_big)
+
+
         roi_big = roi_big.snap_to_grid((40, 4, 4))
+        roi_big = seg.roi.intersect(roi_big)
 
         # Load skeletons.
         gt_db = database.DAGDatabase(self.skel_db_name,
@@ -384,6 +395,7 @@ class EvaluateAnnotations():
 
             seg_skel_to_nodes.setdefault((seg_id, node['neuron_id']), [])
             seg_skel_to_nodes[(seg_id, node['neuron_id'])].append(node)
+
 
         for seg_id in seg_ids_ignore:
             if seg_id in seg_id_to_skel:
