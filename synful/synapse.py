@@ -186,10 +186,15 @@ def write_synapses_into_cremiformat(synapses, filename, offset=None,
     logger.debug('File written to {}'.format(filename))
 
 
-def __find_redundant_synapses(synapses, dist_threshold):
+def __find_redundant_synapses(synapses, dist_threshold, id_type):
     pair_to_syns = {}
     for syn in synapses:
-        pair = (syn.id_segm_pre, syn.id_segm_post)
+        if id_type == 'seg':
+            pair = (syn.id_segm_pre, syn.id_segm_post)
+        elif id_type == 'skel':
+            pair = (syn.id_skel_pre, syn.id_skel_post)
+        else:
+            raise Exception('id_type {} not known'.format(id_type))
         if pair in pair_to_syns:
             pair_to_syns[pair].append(syn)
         else:
@@ -229,12 +234,14 @@ def __find_cc_of_synapses(synapses, dist_threshold):
     return clustered_synapses
 
 
-def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean'):
+def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean', id_type='seg'):
     """ Match synapses with same seg ids in close euclidean distance.
 
     Args:
         synapses (list)): List of synapse.Synapse.
         dist_threshold (float): Threshold for finding connected components.
+        id_type (str): Whether to use seg_id or skel_id to find clusters.
+        Defaults to seg. Possible values are seg or skel.
 
     Returns:
         synapses (list): Returns list of synapse.Synapse with redundant synapses
@@ -243,7 +250,7 @@ def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean'):
         ids (list): Returns a  list of synapse ids, that have been removed from list
 
     """
-    clusters = __find_redundant_synapses(synapses, dist_threshold)
+    clusters = __find_redundant_synapses(synapses, dist_threshold, id_type=id_type)
     id_to_synapses = {}
     for syn in synapses:
         assert syn.id is not None

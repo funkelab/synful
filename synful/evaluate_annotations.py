@@ -51,17 +51,21 @@ class EvaluateAnnotations():
 
     def __init__(self, pred_db_name, pred_db_host, pred_db_col,
                  gt_db_name, gt_db_host, gt_db_col,
-                 distance_upper_bound=None, skel_db_name=None, skel_db_host=None, skel_db_col=None,
+                 distance_upper_bound=None, skel_db_name=None,
+                 skel_db_host=None, skel_db_col=None,
                  multiprocess=True, matching_threshold=400,
                  matching_threshold_only_post=False,
                  matching_threshold_only_pre=False,
                  skeleton_ids=None, res_db_host=None,
                  res_db_name=None, res_db_col=None,
                  res_db_col_summary=None,
-                 filter_same_seg=True, filter_redundant=False,
-                 filter_redundant_dist_thr=None, only_input_synapses=False,
+                 filter_same_id=True, filter_same_id_type='seg', filter_redundant=False,
+                 filter_redundant_dist_thr=None, filter_redundant_id_type='seg', only_input_synapses=False,
                  only_output_synapses=False, overwrite_summary=False,
-                 seg_agglomeration_json=None, roi_file=None, syn_dir=None):
+                 seg_agglomeration_json=None,
+                 roi_file=None, syn_dir=None):
+        assert filter_redundant_id_type == 'seg' or filter_redundant_id_type == 'skel'
+        assert filter_same_id_type == 'seg' or filter_same_id_type == 'skel'
         self.pred_db = pred_db_name
         self.pred_db_host = pred_db_host
         self.pred_db_col = pred_db_col
@@ -82,7 +86,7 @@ class EvaluateAnnotations():
         assert not (
                 only_input_synapses is True and only_output_synapses is True), 'both only_input_synapses and only_output_synapses is set to True, unclear what to do'
         # Evaluation settings
-        self.filter_same_seg = filter_same_seg
+        self.filter_same_id = filter_same_id
         self.filter_redundant = filter_redundant
         self.filter_redundant_dist_thr = filter_redundant_dist_thr
         self.only_input_synapses = only_input_synapses
@@ -95,12 +99,14 @@ class EvaluateAnnotations():
         self.res_db_col = res_db_col
         self.res_db_col_summary = res_db_col_summary
         self.overwrite_summary = overwrite_summary
-        self.skel_db_name= skel_db_name
+        self.skel_db_name = skel_db_name
         self.skel_db_host = skel_db_host
         self.skel_db_col = skel_db_col
         self.seg_agglomeration_json = seg_agglomeration_json
         self.roi_file = roi_file
         self.syn_dir = syn_dir
+        self.filter_same_id_type = filter_same_id_type
+        self.filter_redundant_id_type = filter_redundant_id_type
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
@@ -198,31 +204,40 @@ class EvaluateAnnotations():
             pred_synapses = synapse.create_synapses_from_db(pred_synapses)
             pred_synapses = [syn for syn in pred_synapses if
                              syn.score > score_thr]
-            if self.filter_same_seg:
-                pred_synapses = [syn for syn in pred_synapses if
-                                 syn.id_segm_pre != syn.id_segm_post]
+            if self.filter_same_id:
+                if self.filter_same_id_type == 'seg':
+                    pred_synapses = [syn for syn in pred_synapses if
+                                     syn.id_segm_pre != syn.id_segm_post]
+                elif self.filter_same_id_type == 'skel':
+                    pred_synapses = [syn for syn in pred_synapses if
+                                     syn.id_skel_pre != syn.id_skel_post]
+
             if self.filter_redundant:
                 assert self.filter_redundant_dist_thr is not None
                 num_synapses = len(pred_synapses)
-                __, removed_ids = synapse.cluster_synapses(pred_synapses, self.filter_redundant_dist_thr,
-                                                                  fuse_strategy='max_score')
-                pred_synapses = [syn for syn in pred_synapses if not syn.id in removed_ids]
+                __, removed_ids = synapse.cluster_synapses(pred_synapses,
+                                                           self.filter_redundant_dist_thr,
+                                                           fuse_strategy='max_score',
+                                                           id_type=self.filter_redundant_id_type)
+                pred_synapses = [syn for syn in pred_synapses if
+                                 not syn.id in removed_ids]
                 num_clustered_synapses = num_synapses - len(pred_synapses)
-                logger.debug('num of clustered synapses: {}, skel id: {}'.format(num_clustered_synapses, skel_id))
+                logger.debug(
+                    'num of clustered synapses: {}, skel id: {}'.format(
+                        num_clustered_synapses, skel_id))
             else:
                 num_clustered_synapses = 0
-
 
             logger.debug(
                 'found {} predicted synapses'.format(len(pred_synapses)))
 
             gt_synapses = synapse.create_synapses_from_db(gt_synapses)
             stats = evaluation.synaptic_partners_fscore(pred_synapses,
-                                                               gt_synapses,
-                                                               matching_threshold=self.matching_threshold,
-                                                               all_stats=True,
-                                                               use_only_pre=self.matching_threshold_only_pre,
-                                                               use_only_post=self.matching_threshold_only_post)
+                                                        gt_synapses,
+                                                        matching_threshold=self.matching_threshold,
+                                                        all_stats=True,
+                                                        use_only_pre=self.matching_threshold_only_pre,
+                                                        use_only_post=self.matching_threshold_only_post)
             fscore, precision, recall, fpcount, fncount, matches = stats
 
             tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = evaluation.from_synapsematches_to_syns(
@@ -253,7 +268,8 @@ class EvaluateAnnotations():
         # Alsow write out synapses:
         syn_out = database.SynapseDatabase(self.res_db_name,
                                            db_host=self.res_db_host,
-                                           db_col_name=self.res_db_col + '.syn_thr{}'.format(1000 * score_thr),
+                                           db_col_name=self.res_db_col + '.syn_thr{}'.format(
+                                               1000 * score_thr),
                                            mode='w')
         syn_out.write_synapses(pred_synapses_all)
 
@@ -283,18 +299,21 @@ class EvaluateAnnotations():
         settings['pred_db_name'] = self.pred_db_col
         settings['gt_db_col'] = self.gt_db_col
         settings['gt_db_name'] = self.gt_db_name
-        settings['filter_same_seg'] = self.filter_same_seg
+        settings['filter_same_id'] = self.filter_same_id
+        settings['filter_same_id_type'] = self.filter_same_id_type
         settings['filter_redundant'] = self.filter_redundant
+        settings['filter_redundant_id_type'] = self.filter_redundant_id_type
         settings['dist_thr'] = self.filter_redundant_dist_thr
         settings['skel_ids'] = self.skeleton_ids
         settings['matching_threshold'] = self.matching_threshold
-        settings['matching_threshold_only_post'] = self.matching_threshold_only_post
-        settings['matching_threshold_only_pre'] = self.matching_threshold_only_pre
+        settings[
+            'matching_threshold_only_post'] = self.matching_threshold_only_post
+        settings[
+            'matching_threshold_only_pre'] = self.matching_threshold_only_pre
         settings['only_output_synapses'] = self.only_output_synapses
         settings['only_input_synapses'] = self.only_input_synapses
         settings['num_clustered_synapses'] = num_clustered_synapsesall
         result_dic.update(settings)
-
 
         db_out[self.res_db_col_summary].insert_one(result_dic)
 
@@ -317,14 +336,15 @@ class EvaluateAnnotations():
             for score_thr in score_thresholds:
                 self.get_cremi_score(score_thr)
 
-    def add_skel_ids_daisy(self, roi_core, roi_context, seg_thr, seg_ids_ignore):
+    def add_skel_ids_daisy(self, roi_core, roi_context, seg_thr,
+                           seg_ids_ignore):
         with open(self.seg_agglomeration_json) as f:
             seg_config = json.load(f)
 
         # This reads in all synapses, where postsynaptic site is in ROI, but
         # it is not guaranteed, that presynaptic site is also in ROI.
         synapses = synapse.read_synapses_in_roi(self.syn_dir,
-                                                       roi_core)
+                                                roi_core)
         if len(synapses) == 0:
             logger.debug('no synapse in roi')
             return 0
@@ -336,13 +356,14 @@ class EvaluateAnnotations():
         z_min, y_min, x_min = np.min(np.array(post_locations), axis=0)
         z_max, y_max, x_max = np.min(np.array(post_locations), axis=0)
 
-        roi_big = daisy.Roi((z_min, y_min, x_min), (z_max-z_min, y_max-y_min, x_max-x_min))
+        roi_big = daisy.Roi((z_min, y_min, x_min),
+                            (z_max - z_min, y_max - y_min, x_max - x_min))
         roi_big = roi_big.union(roi_context)
         roi_big = roi_big.snap_to_grid((40, 4, 4))
 
-
         # Load skeletons.
-        gt_db = database.DAGDatabase(self.skel_db_name, db_host=self.skel_db_host,
+        gt_db = database.DAGDatabase(self.skel_db_name,
+                                     db_host=self.skel_db_host,
                                      db_col_name=self.skel_db_col,
                                      mode='r')
         nodes = gt_db.read_nodes(roi_context)
@@ -353,7 +374,6 @@ class EvaluateAnnotations():
         logger.debug('creating a local segmentation')
         locseg = local_segmentation.LocalSegmentationExtractor(**seg_config)
         seg = locseg.get_local_segmentation(roi_big, seg_thr)
-
 
         seg_id_to_skel = {}
         seg_skel_to_nodes = {}
@@ -384,9 +404,10 @@ class EvaluateAnnotations():
                 syn.id_segm_pre = pre_id
                 syn.id_segm_post = post_id
                 syn_on_skels.append(syn)
-        logger.debug('matching {} synapses to skeletons, original number of synapses {}'.format(len(syn_on_skels), len(synapses)))
+        logger.debug(
+            'matching {} synapses to skeletons, original number of synapses {}'.format(
+                len(syn_on_skels), len(synapses)))
         self.match_synapses_to_skeleton(syn_on_skels)
-
 
     def add_skel_ids(self, seg_ids_ignore=[]):
         """Maps synapses to ground truth skeletons and writes them into a
@@ -408,7 +429,8 @@ class EvaluateAnnotations():
 
         """
 
-        gt_db = database.DAGDatabase(self.skel_db_name, db_host=self.skel_db_host,
+        gt_db = database.DAGDatabase(self.skel_db_name,
+                                     db_host=self.skel_db_host,
                                      db_col_name=self.skel_db_col,
                                      mode='r')
 
@@ -424,7 +446,8 @@ class EvaluateAnnotations():
             seg_id_to_skel.setdefault(node['seg_id'], [])
             seg_id_to_skel[node['seg_id']].append(node['neuron_id'])
 
-            seg_skel_to_nodes.setdefault((node['seg_id'], node['neuron_id']), [])
+            seg_skel_to_nodes.setdefault((node['seg_id'], node['neuron_id']),
+                                         [])
             seg_skel_to_nodes[(node['seg_id'], node['neuron_id'])].append(node)
 
         for seg_id in seg_ids_ignore:
@@ -465,9 +488,9 @@ class EvaluateAnnotations():
             for proc in procs:
                 proc.join()
 
-
     def add_skel_ids_majority_vote(self):
-        gt_db = database.DAGDatabase(self.skel_db_name, db_host=self.skel_db_host,
+        gt_db = database.DAGDatabase(self.skel_db_name,
+                                     db_host=self.skel_db_host,
                                      db_col_name=self.skel_db_col,
                                      mode='r')
 
