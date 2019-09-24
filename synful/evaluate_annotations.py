@@ -351,7 +351,7 @@ class EvaluateAnnotations():
                             (z_max - z_min, y_max - y_min, x_max - x_min))
         roi_big = roi_big.union(roi_context)
 
-        roi_big = roi_big.snap_to_grid((40, 4, 4))
+        roi_big = roi_big.snap_to_grid(seg.voxel_size)
         roi_big = seg.roi.intersect(roi_big)
 
         # Load skeletons.
