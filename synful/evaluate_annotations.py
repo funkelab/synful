@@ -25,6 +25,7 @@ def csv_to_list(csvfilename, column):
         col_list.append(int(row[column]))
     return col_list
 
+
 class EvaluateAnnotations():
 
     def __init__(self, pred_db_name, pred_db_host, pred_db_col,
@@ -37,8 +38,10 @@ class EvaluateAnnotations():
                  skeleton_ids=None, res_db_host=None,
                  res_db_name=None, res_db_col=None,
                  res_db_col_summary=None,
-                 filter_same_id=True, filter_same_id_type='seg', filter_redundant=False,
-                 filter_redundant_dist_thr=None, filter_redundant_id_type='seg', only_input_synapses=False,
+                 filter_same_id=True, filter_same_id_type='seg',
+                 filter_redundant=False,
+                 filter_redundant_dist_thr=None, filter_redundant_id_type='seg',
+                 only_input_synapses=False,
                  only_output_synapses=False, overwrite_summary=False,
                  seg_agglomeration_json=None,
                  roi_file=None, syn_dir=None):
@@ -320,7 +323,8 @@ class EvaluateAnnotations():
             seg_config = json.load(f)
 
         # Get actual segmentation ROI
-        seg = daisy.open_ds(seg_config['fragments_file'], seg_config['fragments_dataset'])
+        seg = daisy.open_ds(seg_config['fragments_file'],
+                            seg_config['fragments_dataset'])
 
         # This reads in all synapses, where postsynaptic site is in ROI, but
         # it is not guaranteed, that presynaptic site is also in ROI.
@@ -328,7 +332,8 @@ class EvaluateAnnotations():
                                                 roi_core)
 
         # Make sure to only look at synapses that are inside segmentation ROI.
-        synapses = [syn for syn in synapses if seg.roi.contains(syn.location_pre)
+        synapses = [syn for syn in synapses if
+                    seg.roi.contains(syn.location_pre)
                     and seg.roi.contains(syn.location_post)]
 
         if len(synapses) == 0:
@@ -345,7 +350,6 @@ class EvaluateAnnotations():
         roi_big = daisy.Roi((z_min, y_min, x_min),
                             (z_max - z_min, y_max - y_min, x_max - x_min))
         roi_big = roi_big.union(roi_context)
-
 
         roi_big = roi_big.snap_to_grid((40, 4, 4))
         roi_big = seg.roi.intersect(roi_big)
@@ -381,8 +385,9 @@ class EvaluateAnnotations():
                                          mode='r')
         gt_synapses = gt_db.read_synapses(roi=roi_big)
         gt_synapses = synapse.create_synapses_from_db(gt_synapses)
-        gt_synapses = [syn for syn in gt_synapses if seg.roi.contains(syn.location_pre)
-                    and seg.roi.contains(syn.location_post)]
+        gt_synapses = [syn for syn in gt_synapses if
+                       seg.roi.contains(syn.location_pre)
+                       and seg.roi.contains(syn.location_post)]
         logger.debug('number of catmaid synapses: {}'.format(len(gt_synapses)))
         for gt_syn in gt_synapses:
             seg_id = seg[daisy.Coordinate(gt_syn.location_pre)]
@@ -390,16 +395,16 @@ class EvaluateAnnotations():
             seg_id_to_skel[seg_id].append(gt_syn.id_skel_pre)
             seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_pre), [])
             seg_skel_to_nodes[(seg_id,
-                               gt_syn.id_skel_pre)].append({'position': gt_syn.location_pre})
-
-
+                               gt_syn.id_skel_pre)].append(
+                {'position': gt_syn.location_pre})
 
             seg_id = seg[daisy.Coordinate(gt_syn.location_post)]
             seg_id_to_skel.setdefault(seg_id, [])
             seg_id_to_skel[seg_id].append(gt_syn.id_skel_post)
             seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_post), [])
             seg_skel_to_nodes[(seg_id,
-                               gt_syn.id_skel_post)].append({'position': gt_syn.location_post})
+                               gt_syn.id_skel_post)].append(
+                {'position': gt_syn.location_post})
 
         for seg_id in seg_ids_ignore:
             if seg_id in seg_id_to_skel:
