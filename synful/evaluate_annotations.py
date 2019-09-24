@@ -25,28 +25,6 @@ def csv_to_list(csvfilename, column):
         col_list.append(int(row[column]))
     return col_list
 
-
-def create_synapses_from_db(synapses_dic):
-    synapses = []
-    for syn_dic in synapses_dic:
-        syn = synapse.Synapse(
-            id=syn_dic['id'],
-            location_pre=np.array(
-                (syn_dic['pre_z'], syn_dic['pre_y'], syn_dic['pre_x'])),
-            location_post=np.array(
-                (syn_dic['post_z'], syn_dic['post_y'], syn_dic['post_x'])),
-        )
-        if 'pre_seg_id' in syn_dic:
-            syn.id_segm_pre = syn_dic['pre_seg_id']
-        if 'post_seg_id' in syn_dic:
-            syn.id_segm_post = syn_dic['post_seg_id']
-        if 'score' in syn_dic:
-            syn.score = syn_dic['score']
-
-        synapses.append(syn)
-    return synapses
-
-
 class EvaluateAnnotations():
 
     def __init__(self, pred_db_name, pred_db_host, pred_db_col,
@@ -416,6 +394,7 @@ class EvaluateAnnotations():
                 syn.id_segm_pre = pre_id
                 syn.id_segm_post = post_id
                 syn_on_skels.append(syn)
+
         logger.debug(
             'matching {} synapses to skeletons, original number of synapses {}'.format(
                 len(syn_on_skels), len(synapses)))
@@ -472,7 +451,7 @@ class EvaluateAnnotations():
             {'pre_seg_id': {'$in': list(seg_id_to_skel.keys())}},
             {'post_seg_id': {'$in': list(seg_id_to_skel.keys())}},
         ]})
-        synapses = create_synapses_from_db(synapses)
+        synapses = synapse.create_synapses_from_db(synapses)
 
         logger.debug('found {} synapses '.format(len(synapses)))
         logger.info('Overwriting {}/{}/{}'.format(self.pred_db,
@@ -545,7 +524,7 @@ class EvaluateAnnotations():
             {'pre_seg_id': {'$in': list(seg_id_to_skel.keys())}},
             {'post_seg_id': {'$in': list(seg_id_to_skel.keys())}},
         ]})
-        synapses = create_synapses_from_db(synapses)
+        synapses = synapse.create_synapses_from_db(synapses)
         print('found {} synapses '.format(len(synapses)))
 
         for syn in synapses:
