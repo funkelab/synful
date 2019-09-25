@@ -246,6 +246,7 @@ class EvaluateAnnotations():
             db_out[self.res_db_col + '.thr{}'.format(1000 * score_thr)].insert(
                 db_dic)
             pred_synapses_all.extend(pred_synapses)
+
         # Alsow write out synapses:
         syn_out = database.SynapseDatabase(self.res_db_name,
                                            db_host=self.res_db_host,
@@ -319,6 +320,29 @@ class EvaluateAnnotations():
 
     def add_skel_ids_daisy(self, roi_core, roi_context, seg_thr,
                            seg_ids_ignore):
+        """Maps synapses to ground truth skeletons and writes them into a
+        database.
+        This function creates a local segmentation in order to map synapses to
+        skeletons. It uses euclidean distance to cope with ambigious cases, eg. if one
+        segment contains multiple skeletons, the pre/post site is mapped to
+        the closest skeleton in euclidean space. If distance_upper_bound is set,
+        only synapses are mapped to a skeleton if it closer than
+        distance_upper_bound. Synapses that have been not mapped because of
+        distance_upper_bound are marked with a skel_id of -2.
+
+        Args:
+            roi_core: (``daisy.ROI``): The ROI that is used to read in the
+                synapses.
+            roi_context (``daisy.ROI``): The ROI that is used to read in
+                skeletons and ground truth synapses, that are used for mapping.
+            seg_thr (``float``): Edge score threshold used for agglomerating
+                fragments to produce a local segmentation used for mapping.
+            seg_ids_ignore (``list`` of ``int``):
+                List of ids that are not used for mapping. Eg. all skeletons
+                whose seg id are in seg_ids_ignore are removed and not used
+                for mapping.
+
+        """
         with open(self.seg_agglomeration_json) as f:
             seg_config = json.load(f)
 
