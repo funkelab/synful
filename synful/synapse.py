@@ -29,11 +29,13 @@ class Synapse(object):
         self.score = score
 
     def __repr__(self):
-        output_str = 'seg_ids: [%s, %s], skel_ids: [%s, %s]' % (
+        output_str = 'id: %s, seg_ids: [%s, %s], skel_ids: [%s, %s], score: %s' % (
+            str(self.id),
             str(self.id_segm_pre),
             str(self.id_segm_post),
             str(self.id_skel_pre),
-            str(self.id_skel_post))
+            str(self.id_skel_post),
+            '{:0.3f}'.format(self.score))
         return output_str
 
 def create_synapses_from_db(synapses_dic):
