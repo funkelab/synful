@@ -35,7 +35,7 @@ class Synapse(object):
             str(self.id_segm_post),
             str(self.id_skel_pre),
             str(self.id_skel_post),
-            '{:0.3f}'.format(self.score))
+            '{:0.3f}'.format(self.score) if self.score is not None else None)
         return output_str
 
 def create_synapses_from_db(synapses_dic):
