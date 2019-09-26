@@ -623,7 +623,7 @@ class SynapseDatabase(object):
         self.synapses.insert_many(db_list)
         logger.debug("Insert %d synapses" % len(synapses))
 
-    def read_synapses(self, roi=None):
+    def read_synapses(self, roi=None, pre_post_roi=None):
         """ Read synapses from database.
 
         Args:
@@ -636,7 +636,7 @@ class SynapseDatabase(object):
         if roi is None:
             logger.debug("No roi provided, querying all synapses in database")
             synapses_dic = self.synapses.find()
-        else:
+        elif roi is not None:
             logger.debug("Querying synapses in %s", roi)
             bz, by, bx = roi.get_begin()
             ez, ey, ex = roi.get_end()
@@ -646,6 +646,25 @@ class SynapseDatabase(object):
                     'post_y': {'$gte': by, '$lt': ey},
                     'post_x': {'$gte': bx, '$lt': ex}
                 })
+        elif pre_post_roi is not None:
+            logger.debug("Querying synapses in %s", pre_post_roi)
+            bz, by, bx = roi.get_begin()
+            ez, ey, ex = roi.get_end()
+            synapses_dic = self.synapses.find({'$or':
+                [
+                    {
+                        'post_z': {'$gte': bz, '$lt': ez},
+                        'post_y': {'$gte': by, '$lt': ey},
+                        'post_x': {'$gte': bx, '$lt': ex}
+                    },
+                    {
+                        'pre_z': {'$gte': bz, '$lt': ez},
+                        'pre_y': {'$gte': by, '$lt': ey},
+                        'pre_x': {'$gte': bx, '$lt': ex}
+                    }
+                ]}
+            )
+
         return synapses_dic
 
 
