@@ -4,12 +4,14 @@ import logging
 import multiprocessing as mp
 import os
 import sys
+import scipy
 
 import daisy
 import numpy as np
 from lsd import local_segmentation
 from pymongo import MongoClient
 from scipy.spatial import KDTree
+import pymaid
 
 from . import database, synapse, evaluation
 
@@ -44,9 +46,12 @@ class EvaluateAnnotations():
                  only_input_synapses=False,
                  only_output_synapses=False, overwrite_summary=False,
                  seg_agglomeration_json=None,
-                 roi_file=None, syn_dir=None):
+                 roi_file=None, syn_dir=None,
+                 filter_redundant_dist_type='euclidean'):
         assert filter_redundant_id_type == 'seg' or filter_redundant_id_type == 'skel'
         assert filter_same_id_type == 'seg' or filter_same_id_type == 'skel'
+        assert filter_redundant_dist_type == 'euclidean' or \
+               filter_redundant_dist_type == 'geodesic'
         self.pred_db = pred_db_name
         self.pred_db_host = pred_db_host
         self.pred_db_col = pred_db_col
@@ -88,6 +93,7 @@ class EvaluateAnnotations():
         self.syn_dir = syn_dir
         self.filter_same_id_type = filter_same_id_type
         self.filter_redundant_id_type = filter_redundant_id_type
+        self.filter_redundant_dist_type = filter_redundant_dist_type
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
@@ -196,10 +202,16 @@ class EvaluateAnnotations():
             if self.filter_redundant:
                 assert self.filter_redundant_dist_thr is not None
                 num_synapses = len(pred_synapses)
+                if self.filter_redundant_dist_type == 'geodesic':
+                    # Get skeleton
+                    skeleton = pymaid.get_neurons([skel_id])
+                else:
+                    skeleton = None
                 __, removed_ids = synapse.cluster_synapses(pred_synapses,
                                                            self.filter_redundant_dist_thr,
                                                            fuse_strategy='max_score',
-                                                           id_type=self.filter_redundant_id_type)
+                                                           id_type=self.filter_redundant_id_type,
+                                                           skeleton=skeleton)
                 pred_synapses = [syn for syn in pred_synapses if
                                  not syn.id in removed_ids]
                 num_clustered_synapses = num_synapses - len(pred_synapses)
@@ -295,6 +307,7 @@ class EvaluateAnnotations():
         settings['only_output_synapses'] = self.only_output_synapses
         settings['only_input_synapses'] = self.only_input_synapses
         settings['num_clustered_synapses'] = num_clustered_synapsesall
+        settings['filter_redundant_dist_type'] = self.filter_redundant_dist_type
         result_dic.update(settings)
 
         db_out[self.res_db_col_summary].insert_one(result_dic)

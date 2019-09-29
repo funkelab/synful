@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 from itertools import product, starmap
+import scipy
 
 import h5py
 import numpy as np
@@ -10,6 +11,12 @@ from scipy.sparse.csgraph import csgraph_from_dense, connected_components
 import neuroglancer
 
 logger = logging.getLogger(__name__)
+
+try:
+    import pymaid
+except ImportError:
+    logger.warning('Could not import pymaid, functions with CATMAID skeletons '
+                   'will not work')
 
 
 class Synapse(object):
@@ -188,7 +195,7 @@ def write_synapses_into_cremiformat(synapses, filename, offset=None,
     logger.debug('File written to {}'.format(filename))
 
 
-def __find_redundant_synapses(synapses, dist_threshold, id_type):
+def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
     pair_to_syns = {}
     for syn in synapses:
         if id_type == 'seg':
@@ -205,23 +212,43 @@ def __find_redundant_synapses(synapses, dist_threshold, id_type):
     clusters = []
     for pair, syns in pair_to_syns.items():
         if len(syns) > 1:
+            print(pair)
             # --> multiple synapses have same pre_id and post_id
-            clustered_syns = __find_cc_of_synapses(syns, dist_threshold)
+            clustered_syns = __find_cc_of_synapses(syns, dist_threshold,
+                                                   skeleton=skeleton)
             if len(clustered_syns) > 0:
                 clusters.extend(clustered_syns)
+            print(len(clustered_syns))
     return clusters
 
+def get_closest_treenode_ids(points, skeleton):
+    dist = scipy.spatial.distance.cdist(np.array(skeleton.nodes[['z', 'y', 'x']])-np.array((40, 0, 0)), points)
+    closest_node_ics = np.argmin(dist, axis=0)
+    tree_node_ids = [skeleton.nodes['treenode_id'][index] for index in closest_node_ics]
+    return tree_node_ids
 
-def __find_cc_of_synapses(synapses, dist_threshold):
+
+
+def __find_cc_of_synapses(synapses, dist_threshold, skeleton=None):
     points = np.array([syn.location_post for syn in synapses])
-    dists = np.sqrt(
-        ((points.reshape(-1, 1, 3) - points.reshape(1, -1, 3)) ** 2).sum(
-            axis=2))
+    if skeleton is None:
+        dists = np.sqrt(
+            ((points.reshape(-1, 1, 3) - points.reshape(1, -1, 3)) ** 2).sum(
+                axis=2))
+    else:
+        tree_node_ids = get_closest_treenode_ids(points, skeleton)
+        dists = np.zeros((len(synapses), len(synapses)))
+        for i, node_a in enumerate(tree_node_ids):
+            for j, node_b in enumerate(tree_node_ids):
+                dist = pymaid.graph_utils.dist_between(skeleton, node_a, node_b)
+                dists[i,j] = dist if dist != 0 else -1
+
     # it is a symmetric matrix, remove redundancy
     dists *= np.tri(*dists.shape)
 
     dists[dists > dist_threshold] = np.NaN
-    dists[dists == 0] = np.NaN
+    dists[dists == 0] = np.NaN # half of matrix set to np.nan to account for redundancy
+    dists[dists == -1] = 0 # Those distances that are actually 0, were marked with -1
     sparsematrix = csgraph_from_dense(dists, null_value=np.NAN)
     num_cc, labels = connected_components(sparsematrix,
                                                                directed=False)
@@ -236,14 +263,19 @@ def __find_cc_of_synapses(synapses, dist_threshold):
     return clustered_synapses
 
 
-def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean', id_type='seg'):
-    """ Match synapses with same seg ids in close euclidean distance.
+def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean',
+                     id_type='seg', skeleton=None):
+    """ Match synapses with same seg ids in close euclidean distance or geodesic
+    distance.
 
     Args:
         synapses (list)): List of synapse.Synapse.
         dist_threshold (float): Threshold for finding connected components.
         id_type (str): Whether to use seg_id or skel_id to find clusters.
         Defaults to seg. Possible values are seg or skel.
+        skeleton (int): CATMAID skeleton id, if set, clustering is performed
+        not based on euclidean distance, but on the distance that is calculated
+        along the arbor (called geodesic distance).
 
     Returns:
         synapses (list): Returns list of synapse.Synapse with redundant synapses
@@ -252,7 +284,8 @@ def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean', id_type='se
         ids (list): Returns a  list of synapse ids, that have been removed from list
 
     """
-    clusters = __find_redundant_synapses(synapses, dist_threshold, id_type=id_type)
+    clusters = __find_redundant_synapses(synapses, dist_threshold,
+                                         id_type=id_type, skeleton=skeleton)
     id_to_synapses = {}
     for syn in synapses:
         assert syn.id is not None
