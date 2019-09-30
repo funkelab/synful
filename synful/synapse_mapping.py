@@ -129,6 +129,8 @@ class SynapseMapping(object):
                     # Exclude skeletons with a single node (this comes
                     # often from noisy annotation)
                     if 0 < num_nodes <= self.num_skel_nodes_ignore:
+                        logger.debug(
+                            'ignoring {} syn id: {}'.format(skel_id, syn.id))
                         skel_ids.remove(skel_id)
             if len(skel_ids) > 0:
 
@@ -143,6 +145,8 @@ class SynapseMapping(object):
                 num_nodes = self.seg_id_to_skel.get(syn.id_segm_post,
                                                     []).count(skel_id)
                 if 0 < num_nodes <= self.num_skel_nodes_ignore:
+                    logger.debug(
+                        'ignoring {} syn id: {}'.format(skel_id, syn.id))
                     skel_ids.remove(skel_id)
             if len(skel_ids) > 0:
                 skel_ids = [
