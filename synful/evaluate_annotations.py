@@ -235,6 +235,9 @@ class EvaluateAnnotations():
 
             tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = evaluation.from_synapsematches_to_syns(
                 matches, pred_synapses, gt_synapses)
+            tp_ids = [tp_syn.id for tp_syn in tp_syns]
+            tp_ids_gt = [syn.id for syn in tp_syns_gt]
+            matched_synapse_ids = [pair for pair in zip(tp_ids, tp_ids_gt)]
             fpcountall += fpcount
             fncountall += fncount
             tpcountall += len(matches)
@@ -247,6 +250,7 @@ class EvaluateAnnotations():
                 'tp_gt': [syn.id for syn in tp_syns_gt],
                 'fp_pred': [syn.id for syn in fp_syns],
                 'fn_gt': [syn.id for syn in fn_syns_gt],
+                'matched_synapse_ids': matched_synapse_ids,
                 'fscore': stats[0],
                 'precision': stats[1],
                 'recall': stats[2],
