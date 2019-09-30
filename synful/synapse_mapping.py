@@ -56,6 +56,10 @@ class SynapseMapping(object):
         distance_upper_bound (float): If synapses are further away than
             distance_upper_bound, they are not mapped to the skeleton, although
             they are intersecting the same segment.
+        num_skel_nodes_ignore (``int``): Ignore skeletons that intersect with
+            number of skeletons: num_skel_nodes_ignore or less. This is used
+            to account for noisy/incorrectly placed skeleton nodes, which
+            should be ignored during mapping.
 
     '''
 
@@ -65,7 +69,8 @@ class SynapseMapping(object):
                  syndir=None, syn_db_name=None, syn_db_host=None,
                  syn_db_col=None, gtsyn_db_name=None, gtsyn_db_host=None,
                  gtsyn_db_col=None,
-                 seg_agglomeration_json=None, distance_upper_bound=None):
+                 seg_agglomeration_json=None,
+                 distance_upper_bound=None, num_skel_nodes_ignore=0):
         assert syndir is not None or syn_db is not None, 'synapses have to be ' \
                                                          'provided either in syndir format or db format'
 
@@ -86,6 +91,7 @@ class SynapseMapping(object):
                                                                distance_upper_bound is None else distance_upper_bound)
         self.seg_agglomeration_json = seg_agglomeration_json
         self.distance_upper_bound = distance_upper_bound
+        self.num_skel_nodes_ignore = num_skel_nodes_ignore
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
@@ -115,15 +121,29 @@ class SynapseMapping(object):
         for ii, syn in enumerate(synapses):
             logger.debug('{}/{}'.format(ii, len(synapses)))
             # Allow to filter out synapses based on distance.
-            skel_ids = np.unique(self.seg_id_to_skel.get(syn.id_segm_pre, []))
+            skel_ids = list(np.unique(self.seg_id_to_skel.get(syn.id_segm_pre, [])))
+            if self.num_skel_nodes_ignore > 0 :
+                for skel_id in skel_ids:
+                    num_nodes = self.seg_id_to_skel.get(syn.id_segm_pre,
+                                                        []).count(skel_id)
+                    # Exclude skeletons with a single node (this comes
+                    # often from noisy annotation)
+                    if 0 < num_nodes <= self.num_skel_nodes_ignore:
+                        skel_ids.remove(skel_id)
             if len(skel_ids) > 0:
+
                 skel_ids = [
                     self.__match_position_to_closest_skeleton(syn.location_pre,
                                                               syn.id_segm_pre,
                                                               skel_ids)]
             syn.id_skel_pre = skel_ids[0] if len(skel_ids) > 0 else None
 
-            skel_ids = np.unique(self.seg_id_to_skel.get(syn.id_segm_post, []))
+            skel_ids = list(np.unique(self.seg_id_to_skel.get(syn.id_segm_post, [])))
+            for skel_id in skel_ids:
+                num_nodes = self.seg_id_to_skel.get(syn.id_segm_post,
+                                                    []).count(skel_id)
+                if 0 < num_nodes <= self.num_skel_nodes_ignore:
+                    skel_ids.remove(skel_id)
             if len(skel_ids) > 0:
                 skel_ids = [
                     self.__match_position_to_closest_skeleton(syn.location_post,
