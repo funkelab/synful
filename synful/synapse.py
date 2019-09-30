@@ -212,13 +212,11 @@ def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
     clusters = []
     for pair, syns in pair_to_syns.items():
         if len(syns) > 1:
-            print(pair)
             # --> multiple synapses have same pre_id and post_id
             clustered_syns = __find_cc_of_synapses(syns, dist_threshold,
                                                    skeleton=skeleton)
             if len(clustered_syns) > 0:
                 clusters.extend(clustered_syns)
-            print(len(clustered_syns))
     return clusters
 
 def get_closest_treenode_ids(points, skeleton):
