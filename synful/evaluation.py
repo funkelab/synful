@@ -6,7 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 def synaptic_partners_fscore(rec_annotations, gt_annotations, matching_threshold=400,
-                             all_stats=False, use_only_pre=False, use_only_post=False):
+                             all_stats=False, use_only_pre=False, use_only_post=False,
+                             id_type='skel'):
     """Compute the f-score of the found synaptic partners. Original function
     from: https://github.com/cremi/cremi_python. Modified, such that it
     works with synful.Synapse.
@@ -32,6 +33,10 @@ def synaptic_partners_fscore(rec_annotations, gt_annotations, matching_threshold
     all_stats: boolean, optional
         Whether to also return precision, recall, FP, FN, and matches as a 6-tuple with f-score
 
+    id_type: str, optional
+        Whether to use segmentation id (seg) or skeleton id (skel) for
+        checking connectivity.
+
     Returns
     -------
 
@@ -47,7 +52,7 @@ def synaptic_partners_fscore(rec_annotations, gt_annotations, matching_threshold
 
     # get cost matrix
     costs = cost_matrix(rec_annotations, gt_annotations, matching_threshold,
-                        use_only_pre, use_only_post)
+                        use_only_pre, use_only_post, id_type=id_type)
 
     # match using Hungarian method
     logger.debug("Finding cost-minimal matches...")
@@ -100,7 +105,7 @@ def from_synapsematches_to_syns(matches, pred_synapses, gt_synapses):
 
     return tp_syns, fp_syns, fn_syns_gt, tp_syns_gt
 
-def cost_matrix(rec, gt, matching_threshold, use_only_pre=False, use_only_post=False):
+def cost_matrix(rec, gt, matching_threshold, use_only_pre=False, use_only_post=False, id_type):
     logger.debug("Computing matching costs...")
 
     rec_locations = [(syn.location_pre, syn.location_post) for syn in rec]
@@ -112,7 +117,7 @@ def cost_matrix(rec, gt, matching_threshold, use_only_pre=False, use_only_post=F
     num_potential_matches = 0
     for i in range(len(rec_locations)):
         for j in range(len(gt_locations)):
-            c = cost(rec_locations[i], gt_locations[j], rec[i], gt[j], matching_threshold, use_only_pre, use_only_post)
+            c = cost(rec_locations[i], gt_locations[j], rec[i], gt[j], matching_threshold, use_only_pre, use_only_post, id_type)
             costs[i, j] = c
             if c <= matching_threshold:
                 num_potential_matches += 1
@@ -123,15 +128,28 @@ def cost_matrix(rec, gt, matching_threshold, use_only_pre=False, use_only_post=F
 
 
 def cost(pre_post_location1, pre_post_location2, syn1, syn2,
-         matching_threshold, use_only_pre, use_only_post):
+         matching_threshold, use_only_pre, use_only_post, id_type):
     max_cost = 2 * matching_threshold
 
     # First check of the nodes are part of the same segment
 
-    pre_label_same = syn1.id_segm_pre == syn2.id_segm_pre or syn1.id_skel_pre == syn2.id_skel_pre
-    post_label_same = syn1.id_segm_post == syn2.id_segm_post or syn1.id_skel_post == syn2.id_skel_post
-    if syn1.id_segm_pre == None or syn1.id_segm_post == None:
-        pre_label_same = False  # If segm is not known, it is considered a False Positive.
+
+    if id_type == 'skel':
+        pre_label_same = syn1.id_skel_pre == syn2.id_skel_pre
+        post_label_same = syn1.id_skel_post == syn2.id_skel_post
+        if syn1.id_skel_pre is None or syn2.id_skel_pre is None:
+            pre_label_same = False
+        if syn1.id_skel_post or syn2.id_skel_post:
+            post_label_same = False
+    elif id_type == 'seg':
+        pre_label_same = syn1.id_segm_pre == syn2.id_segm_pre
+        post_label_same = syn1.id_segm_post == syn2.id_segm_post
+        if syn1.id_segm_pre is None or syn2.id_segm_pre is None:
+            pre_label_same = False
+        if syn1.id_segm_post or syn2.id_segm_post:
+            post_label_same = False
+    else:
+        raise ValueError('id_type {} unknown'.format(id_type))
 
     # pairs do not link the same segments
     if not pre_label_same or not post_label_same:
