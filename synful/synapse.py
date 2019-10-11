@@ -204,6 +204,8 @@ def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
             pair = (syn.id_skel_pre, syn.id_skel_post)
         else:
             raise Exception('id_type {} not known'.format(id_type))
+        if None in pair:
+            continue
         if pair in pair_to_syns:
             pair_to_syns[pair].append(syn)
         else:
