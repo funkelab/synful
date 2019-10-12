@@ -70,8 +70,9 @@ class SynapseMapping(object):
                  syn_db_col=None, gtsyn_db_name=None, gtsyn_db_host=None,
                  gtsyn_db_col=None,
                  seg_agglomeration_json=None,
-                 distance_upper_bound=None, num_skel_nodes_ignore=0):
-        assert syndir is not None or syn_db is not None, 'synapses have to be ' \
+                 distance_upper_bound=None, num_skel_nodes_ignore=0,
+                 multiprocess=False):
+        assert syndir is not None or syn_db_col is not None, 'synapses have to be ' \
                                                          'provided either in syndir format or db format'
 
         self.skel_db_name = skel_db_name
@@ -92,6 +93,7 @@ class SynapseMapping(object):
         self.seg_agglomeration_json = seg_agglomeration_json
         self.distance_upper_bound = distance_upper_bound
         self.num_skel_nodes_ignore = num_skel_nodes_ignore
+        self.multiprocess = multiprocess
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
