@@ -52,7 +52,7 @@ def synaptic_partners_fscore(rec_annotations, gt_annotations, matching_threshold
 
     # get cost matrix
     costs = cost_matrix(rec_annotations, gt_annotations, matching_threshold,
-                        use_only_pre, use_only_post, id_type=id_type)
+                        id_type, use_only_pre, use_only_post)
 
     # match using Hungarian method
     logger.debug("Finding cost-minimal matches...")
@@ -105,7 +105,7 @@ def from_synapsematches_to_syns(matches, pred_synapses, gt_synapses):
 
     return tp_syns, fp_syns, fn_syns_gt, tp_syns_gt
 
-def cost_matrix(rec, gt, matching_threshold, use_only_pre=False, use_only_post=False, id_type):
+def cost_matrix(rec, gt, matching_threshold, id_type, use_only_pre=False, use_only_post=False):
     logger.debug("Computing matching costs...")
 
     rec_locations = [(syn.location_pre, syn.location_post) for syn in rec]
@@ -133,20 +133,19 @@ def cost(pre_post_location1, pre_post_location2, syn1, syn2,
 
     # First check of the nodes are part of the same segment
 
-
     if id_type == 'skel':
         pre_label_same = syn1.id_skel_pre == syn2.id_skel_pre
         post_label_same = syn1.id_skel_post == syn2.id_skel_post
         if syn1.id_skel_pre is None or syn2.id_skel_pre is None:
             pre_label_same = False
-        if syn1.id_skel_post or syn2.id_skel_post:
+        if syn1.id_skel_post is None or syn2.id_skel_post is None:
             post_label_same = False
     elif id_type == 'seg':
         pre_label_same = syn1.id_segm_pre == syn2.id_segm_pre
         post_label_same = syn1.id_segm_post == syn2.id_segm_post
         if syn1.id_segm_pre is None or syn2.id_segm_pre is None:
             pre_label_same = False
-        if syn1.id_segm_post or syn2.id_segm_post:
+        if syn1.id_segm_post is None or syn2.id_segm_post is None:
             post_label_same = False
     else:
         raise ValueError('id_type {} unknown'.format(id_type))
