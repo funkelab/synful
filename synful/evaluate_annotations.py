@@ -162,7 +162,6 @@ class EvaluateAnnotations():
             self.res_db_col + '.thr{}'.format(1000 * score_thr))
 
         skel_ids = csv_to_list(self.skeleton_ids, 0)
-        print(skel_ids)
 
         fpcountall, fncountall, predall, gtall, tpcountall, num_clustered_synapsesall = 0, 0, 0, 0, 0, 0
 
@@ -221,6 +220,7 @@ class EvaluateAnnotations():
             else:
                 num_clustered_synapses = 0
 
+
             logger.debug(
                 'found {} predicted synapses'.format(len(pred_synapses)))
 
@@ -231,16 +231,17 @@ class EvaluateAnnotations():
                                                         all_stats=True,
                                                         use_only_pre=self.matching_threshold_only_pre,
                                                         use_only_post=self.matching_threshold_only_post)
-            fscore, precision, recall, fpcount, fncount, matches = stats
+            fscore, precision, recall, fpcount, fncount, tp_fp_fn_syns = stats
 
-            tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = evaluation.from_synapsematches_to_syns(
-                matches, pred_synapses, gt_synapses)
+            # tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = evaluation.from_synapsematches_to_syns(
+            #     matches, pred_synapses, gt_synapses)
+            tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = tp_fp_fn_syns
             tp_ids = [tp_syn.id for tp_syn in tp_syns]
             tp_ids_gt = [syn.id for syn in tp_syns_gt]
             matched_synapse_ids = [pair for pair in zip(tp_ids, tp_ids_gt)]
             fpcountall += fpcount
             fncountall += fncount
-            tpcountall += len(matches)
+            tpcountall += len(tp_syns_gt)
             predall += len(pred_synapses)
             gtall += len(gt_synapses)
             num_clustered_synapsesall += num_clustered_synapses

@@ -5,7 +5,135 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def synaptic_partners_fscore(rec_annotations, gt_annotations, matching_threshold=400,
+def synaptic_partners_fscore(rec_annotations, gt_annotations,
+                             matching_threshold=400,
+                             all_stats=False, use_only_pre=False,
+                             use_only_post=False,
+                             id_type='skel'):
+    """Compute the f-score of the found synaptic partners. Original function
+    from: https://github.com/cremi/cremi_python. Modified, such that it
+    works with synful.Synapse. Represents fast version, in which connectivity pairs
+    are already preselected, before solving hungarian matching.
+
+    Parameters
+    ----------
+
+    rec_annotations: List of predicted synapses (synful.Synapse)
+
+    gt_annotations: List of ground truth synapses (synful.Synapse)
+
+    matching_threshold: float, world units
+        Euclidean distance threshold to consider two synapses a potential
+        match. Synapses that are `matching_threshold` or more untis apart
+        from each other are not considered as potential matches.
+
+    use_only_pre: whether to only consider the distance of presites for
+        applying the matching_threshold.
+
+    use_only_post: whether to only consider the distance of postsites for
+        applying the matching_threshold.
+
+    all_stats: boolean, optional
+        Whether to also return precision, recall, FP, FN, and matches as a 6-tuple with f-score
+
+    id_type: str, optional
+        Whether to use segmentation id (seg) or skeleton id (skel) for
+        checking connectivity.
+
+    Returns
+    -------
+
+    fscore: float
+        The f-score of the found synaptic partners.
+    precision: float, optional
+    recall: float, optional
+    fp: int, optional
+    fn: int, optional
+    all_syns: (tp_syns, fp_syns, fn_syns_gt, tp_syns_gt)
+    """
+
+    # Help hungarian matching by prematching synapses with same connectivity
+    gt_pair_dic = {}
+    for syn in gt_annotations:
+        if id_type == 'seg':
+            pair = (syn.id_segm_pre, syn.id_segm_post)
+        elif id_type == 'skel':
+            pair = (syn.id_skel_pre, syn.id_skel_post)
+        else:
+            raise Exception('id_type {} not known'.format(id_type))
+        gt_pair_dic.setdefault(pair, [])
+        gt_pair_dic[pair].append(syn)
+
+    rec_pair_dic = {}
+    for syn in rec_annotations:
+        if id_type == 'seg':
+            pair = (syn.id_segm_pre, syn.id_segm_post)
+        elif id_type == 'skel':
+            pair = (syn.id_skel_pre, syn.id_skel_post)
+        else:
+            raise Exception('id_type {} not known'.format(id_type))
+        rec_pair_dic.setdefault(pair, [])
+        rec_pair_dic[pair].append(syn)
+
+    fpcountall = 0
+    fncountall = 0
+    all_matches = []
+    fscores = []
+    tp_syns_all = []
+    fp_syns_all = []
+    fn_syns_gt_all = []
+    tp_syns_gt_all = []
+    for pair, gt_syns in gt_pair_dic.items():
+        pred_syns = rec_pair_dic.get(pair, [])
+        if len(pred_syns) != 0:
+            fscore, precision, recall, fpcount, fncount, filtered_matches = __synaptic_partners_fscore(
+                pred_syns, gt_syns, matching_threshold,
+                all_stats=True, use_only_pre=use_only_pre,
+                use_only_post=use_only_post, id_type=id_type)
+            tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = from_synapsematches_to_syns(
+                filtered_matches, pred_syns, gt_syns)
+            tp_syns_all.extend(tp_syns)
+            fp_syns_all.extend(fp_syns)
+            fn_syns_gt_all.extend(fn_syns_gt)
+            tp_syns_gt_all.extend(tp_syns_gt)
+            fscores.append(fscore)
+        else:
+            # If no predicted synapse with gt_pair connectivity, they are all FNs.
+            fncount = len(
+                gt_syns)
+            fpcount = 0
+            filtered_matches = []
+
+        fpcountall += fpcount
+        fncountall += fncount
+        all_matches.extend(filtered_matches)
+
+    # All pairs that are not in the ground truth represent False Positives
+    unmatched_pairs = set(rec_pair_dic.keys()) - set(gt_pair_dic.keys())
+    for pair in list(unmatched_pairs):
+        fpcountall += len(rec_pair_dic[pair])
+        fp_syns_all.extend(rec_pair_dic[pair])
+
+    tp = len(all_matches)
+    fp = fpcountall
+    fn = fncountall
+
+    precision = float(tp) / (tp + fp) if (tp + fp) > 0 else 0
+    recall = float(tp) / (tp + fn) if (tp + fn) > 0 else 0
+    if (precision + recall) > 0:
+        fscore = 2.0 * precision * recall / (precision + recall)
+    else:
+        fscore = 0.0
+
+    if all_stats:
+
+        all_syns = [tp_syns_all, fp_syns_all, fn_syns_gt_all, tp_syns_gt_all]
+        return (fscore, precision, recall, fp, fn, all_syns)
+    else:
+        return fscore
+
+
+def __synaptic_partners_fscore(rec_annotations, gt_annotations, matching_threshold=400,
                              all_stats=False, use_only_pre=False, use_only_post=False,
                              id_type='skel'):
     """Compute the f-score of the found synaptic partners. Original function

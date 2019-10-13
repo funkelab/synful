@@ -333,6 +333,34 @@ class SynapseMapping(object):
                                          [])
             seg_skel_to_nodes[(node['seg_id'], node['neuron_id'])].append(node)
 
+
+        # Also add ground truth connectors.
+        if self.gtsyn_db_name is not None:
+            gt_db = database.SynapseDatabase(self.gtsyn_db_name,
+                                             db_host=self.gtsyn_db_host,
+                                             db_col_name=self.gtsyn_db_col,
+                                             mode='r')
+            gt_synapses = gt_db.read_synapses()
+            gt_synapses = synapse.create_synapses_from_db(gt_synapses)
+            logger.debug('number of catmaid synapses: {}'.format(len(gt_synapses)))
+            for gt_syn in gt_synapses:
+
+                seg_id = gt_syn.id_segm_pre
+                seg_id_to_skel.setdefault(seg_id, [])
+                seg_id_to_skel[seg_id].append(gt_syn.id_skel_pre)
+                seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_pre), [])
+                seg_skel_to_nodes[(seg_id,
+                                   gt_syn.id_skel_pre)].append(
+                    {'position': gt_syn.location_pre})
+
+                seg_id = gt_syn.id_segm_post
+                seg_id_to_skel.setdefault(seg_id, [])
+                seg_id_to_skel[seg_id].append(gt_syn.id_skel_post)
+                seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_post), [])
+                seg_skel_to_nodes[(seg_id,
+                                   gt_syn.id_skel_post)].append(
+                    {'position': gt_syn.location_post})
+
         for seg_id in seg_ids_ignore:
             if seg_id in seg_id_to_skel:
                 del seg_id_to_skel[seg_id]
