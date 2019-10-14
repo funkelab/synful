@@ -620,7 +620,9 @@ class SynapseDatabase(object):
                 syn_dic['post_skel_id'] = int(syn.id_skel_post)
             db_list.append(syn_dic)
 
-        self.synapses.insert_many(db_list)
+        write_size = 1000
+        for i in range(0, len(db_list), write_size):
+            self.synapses.insert_many(db_list[i:i+write_size])
         logger.debug("Insert %d synapses" % len(synapses))
 
     def read_synapses(self, roi=None, pre_post_roi=None):
