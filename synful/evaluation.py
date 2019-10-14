@@ -103,6 +103,7 @@ def synaptic_partners_fscore(rec_annotations, gt_annotations,
                 gt_syns)
             fpcount = 0
             filtered_matches = []
+            fn_syns_gt_all.extend(gt_syns)
 
         fpcountall += fpcount
         fncountall += fncount
@@ -113,11 +114,13 @@ def synaptic_partners_fscore(rec_annotations, gt_annotations,
     for pair in list(unmatched_pairs):
         fpcountall += len(rec_pair_dic[pair])
         fp_syns_all.extend(rec_pair_dic[pair])
-
     tp = len(all_matches)
     fp = fpcountall
     fn = fncountall
 
+    assert fncountall == len(fn_syns_gt_all)
+    assert fpcountall == len(fp_syns_all)
+    assert len(tp_syns_gt_all) == len(tp_syns_all)
     precision = float(tp) / (tp + fp) if (tp + fp) > 0 else 0
     recall = float(tp) / (tp + fn) if (tp + fn) > 0 else 0
     if (precision + recall) > 0:
