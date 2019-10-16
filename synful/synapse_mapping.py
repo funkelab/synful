@@ -283,7 +283,6 @@ class SynapseMapping(object):
             else:
                 logger.info(
                     'number of catmaid synapses: {}'.format(len(gt_synapses)))
-                print(gt_synapses.columns, 'columns')
                 pre_nodes = pd.DataFrame()
                 pre_nodes['neuron_id'] = gt_synapses['pre_skel_id']
                 pre_nodes['position'] = list(
