@@ -659,8 +659,8 @@ class SynapseDatabase(object):
                 })
         elif pre_post_roi is not None:
             logger.debug("Querying synapses in %s", pre_post_roi)
-            bz, by, bx = roi.get_begin()
-            ez, ey, ex = roi.get_end()
+            bz, by, bx = pre_post_roi.get_begin()
+            ez, ey, ex = pre_post_roi.get_end()
             synapses_dic = self.synapses.find({'$or':
                 [
                     {
