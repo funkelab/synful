@@ -25,7 +25,8 @@ class Synapse(object):
 
     def __init__(self, id=None, id_segm_pre=None, id_segm_post=None,
                  location_pre=None, location_post=None, score=None,
-                 id_skel_pre=None, id_skel_post=None):
+                 id_skel_pre=None, id_skel_post=None, node_id_pre=None,
+                 node_id_post=None):
         self.id = id
         self.id_segm_pre = id_segm_pre
         self.id_segm_post = id_segm_post
@@ -33,6 +34,8 @@ class Synapse(object):
         self.location_post = location_post
         self.id_skel_pre = id_skel_pre
         self.id_skel_post = id_skel_post
+        self.node_id_pre = node_id_pre
+        self.node_id_post = node_id_post
         self.score = score
 
     def __repr__(self):
@@ -59,6 +62,8 @@ def create_synapses_from_db(synapses_dic):
         syn.id_skel_post = syn_dic.get('post_skel_id', None)
         syn.id_segm_pre = syn_dic.get('pre_seg_id', None)
         syn.id_segm_post = syn_dic.get('post_seg_id', None)
+        syn.node_id_pre = syn_dic.get('pre_node_id', None)
+        syn.node_id_post = syn_dic.get('post_node_id', None)
         syn.score = syn_dic.get('score', None)
 
         synapses.append(syn)
