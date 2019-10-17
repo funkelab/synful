@@ -266,8 +266,12 @@ class SynapseMapping(object):
         seg = locseg.get_local_segmentation(roi_big, seg_thr)
 
         nodes_df = pd.DataFrame(nodes)
-        nodes_df['seg_id'] = nodes_df.apply(lambda row:
-                                            seg[daisy.Coordinate(row['position'])], axis=1)
+        if len(nodes_df) > 0:
+            nodes_df = nodes_df[nodes_df.apply(
+                lambda row: seg.roi.contains(daisy.Coordinate(row['position'])),
+                axis=1)]
+            nodes_df['seg_id'] = nodes_df.apply(lambda row:
+                                                seg[daisy.Coordinate(row['position'])], axis=1)
 
 
         # # Also add ground truth connectors.
@@ -308,10 +312,11 @@ class SynapseMapping(object):
                                                           row['position'])], axis=1)
                 nodes_df = nodes_df.append(syn_nodes, sort=False)
 
-        nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
+
         if len(nodes_df) == 0:
             logger.info('Neither skeleton nor synapse node found.')
             return 0
+        nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
 
         pre_ids = [seg[pre_loc] for pre_loc in pre_locations]
         post_ids = [seg[post_loc] for post_loc in post_locations]
@@ -401,10 +406,11 @@ class SynapseMapping(object):
                 syn_nodes = pd.concat([pre_nodes, post_nodes])
                 nodes_df = nodes_df.append(syn_nodes, sort=False)
 
-        nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
+
         if len(nodes_df) == 0:
             logger.info('Neither skeleton nor synapse node found.')
             return 0
+        nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
         self.skel_df = nodes_df
 
         seg_ids = list(np.unique(nodes_df.seg_id))
