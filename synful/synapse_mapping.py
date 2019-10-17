@@ -50,7 +50,8 @@ class SynapseMapping(object):
             Synapses to be mapped stored in mongodb.
         gtsyn_db_name (``str``):
             If provided, those synapses are used as additional "skeletons" to
-            which the synapses can be mapped to.
+            which the synapses can be mapped to. Those nodes are ignored by
+            num_skel_nodes_ignore eg. they are always used for mapping.
         gtsyn_db_host (``str``).
         gtsyn_db_col (``str``)
         seg_agglomeration_json (``str``): Jsonfile to produce a local segmentation.
