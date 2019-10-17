@@ -2,6 +2,7 @@ import json
 import logging
 import multiprocessing as mp
 import sys
+import pandas as pd
 
 import daisy
 import numpy as np
@@ -94,12 +95,12 @@ class SynapseMapping(object):
         self.distance_upper_bound = distance_upper_bound
         self.num_skel_nodes_ignore = num_skel_nodes_ignore
         self.multiprocess = multiprocess
+        self.skel_df = pd.DataFrame()
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
         for skel_id in skel_ids:
-            locations = [np.array(node['position']) for node in
-                         self.seg_skel_to_nodes[(seg_id, skel_id)]]
+            locations = list(self.skel_df[(self.skel_df.seg_id == seg_id) & (self.skel_df.neuron_id == skel_id)].position.apply(np.array))
             tree = KDTree(locations)
             dist = tree.query(x=np.array(position), k=1, eps=0, p=2,
                               distance_upper_bound=np.inf)[0]
@@ -122,33 +123,60 @@ class SynapseMapping(object):
 
         for ii, syn in enumerate(synapses):
             logger.debug('{}/{}'.format(ii, len(synapses)))
-            # Allow to filter out synapses based on distance.
-            skel_ids = list(np.unique(self.seg_id_to_skel.get(syn.id_segm_pre, [])))
-            if self.num_skel_nodes_ignore > 0 :
-                for skel_id in skel_ids:
-                    num_nodes = self.seg_id_to_skel.get(syn.id_segm_pre,
-                                                        []).count(skel_id)
-                    # Exclude skeletons with a single node (this comes
-                    # often from noisy annotation)
-                    if 0 < num_nodes <= self.num_skel_nodes_ignore:
-                        logger.debug(
-                            'ignoring {} syn id: {}'.format(skel_id, syn.id))
-                        skel_ids.remove(skel_id)
-            if len(skel_ids) > 0:
 
+            # Which skeletons intersect with segmentation id ?
+            skel_ids = list(np.unique(self.skel_df[self.skel_df['seg_id'] == syn.id_segm_pre]['neuron_id']))
+            if self.num_skel_nodes_ignore > 0:
+                for skel_id in skel_ids:
+                    # With how many nodes does the skeleton intersect
+                    # current segment ?
+                    num_nodes = len(np.unique(self.skel_df[(self.skel_df[
+                                                                'seg_id'] == syn.id_segm_pre) & (
+                                                                       self.skel_df[
+                                                                           'neuron_id'] == skel_id)][
+                                                  'id']))
+                    node_types = np.unique(self.skel_df[(self.skel_df[
+                                                                'seg_id'] == syn.id_segm_pre) & (
+                                                                       self.skel_df[
+                                                                           'neuron_id'] == skel_id)][
+                                                  'type'])
+                    include_node = 'connector' in node_types or 'post_tree_node' in node_types
+
+                    # Exclude skeletons when they have fewer numbers inside the
+                    # segment than num_skel_nodes_ignore.
+                    if 0 < num_nodes <= self.num_skel_nodes_ignore and not include_node:
+                        logger.debug(
+                            'ignoring skel id: {} syn id: {}'.format(
+                                skel_id, syn.id))
+                        skel_ids.remove(skel_id)
+
+            if len(skel_ids) > 0:
                 skel_ids = [
                     self.__match_position_to_closest_skeleton(syn.location_pre,
                                                               syn.id_segm_pre,
                                                               skel_ids)]
             syn.id_skel_pre = skel_ids[0] if len(skel_ids) > 0 else None
 
-            skel_ids = list(np.unique(self.seg_id_to_skel.get(syn.id_segm_post, [])))
+            skel_ids = list(np.unique(self.skel_df[self.skel_df['seg_id'] == syn.id_segm_post]['neuron_id']))
             for skel_id in skel_ids:
-                num_nodes = self.seg_id_to_skel.get(syn.id_segm_post,
-                                                    []).count(skel_id)
-                if 0 < num_nodes <= self.num_skel_nodes_ignore:
+                num_nodes = len(np.unique(self.skel_df[(self.skel_df[
+                                                            'seg_id'] == syn.id_segm_post) & (
+                                                               self.skel_df[
+                                                                   'neuron_id'] == skel_id)][
+                                              'id']))
+                node_types = np.unique(self.skel_df[(self.skel_df[
+                                                         'seg_id'] == syn.id_segm_post) & (
+                                                            self.skel_df[
+                                                                'neuron_id'] == skel_id)][
+                                           'type'])
+                include_node = 'connector' in node_types or 'post_tree_node' in node_types
+
+                # Exclude skeletons when they have fewer numbers inside the
+                # segment than num_skel_nodes_ignore.
+                if 0 < num_nodes <= self.num_skel_nodes_ignore and not include_node:
                     logger.debug(
-                        'ignoring {} syn id: {}'.format(skel_id, syn.id))
+                        'ignoring skel id: {} syn id: {}'.format(
+                            skel_id, syn.id))
                     skel_ids.remove(skel_id)
             if len(skel_ids) > 0:
                 skel_ids = [
@@ -230,55 +258,59 @@ class SynapseMapping(object):
                                      mode='r')
         nodes = gt_db.read_nodes(roi_context)
         logger.info('number of skel nodes {}'.format(len(nodes)))
-        if len(nodes) == 0:
-            return 0
+
 
         logger.debug('creating a local segmentation')
         locseg = local_segmentation.LocalSegmentationExtractor(**seg_config)
         seg = locseg.get_local_segmentation(roi_big, seg_thr)
 
-        seg_id_to_skel = {}
-        seg_skel_to_nodes = {}
-        for node in nodes:
-            seg_id = seg[daisy.Coordinate(node['position'])]
-            seg_id_to_skel.setdefault(seg_id, [])
-            seg_id_to_skel[seg_id].append(node['neuron_id'])
+        nodes_df = pd.DataFrame(nodes)
+        nodes_df['seg_id'] = nodes_df.apply(lambda row:
+                                            seg[daisy.Coordinate(row['position'])], axis=1)
 
-            seg_skel_to_nodes.setdefault((seg_id, node['neuron_id']), [])
-            seg_skel_to_nodes[(seg_id, node['neuron_id'])].append(node)
 
-        # Also add ground truth connectors.
+        # # Also add ground truth connectors.
         if self.gtsyn_db_name is not None:
             gt_db = database.SynapseDatabase(self.gtsyn_db_name,
                                              db_host=self.gtsyn_db_host,
                                              db_col_name=self.gtsyn_db_col,
                                              mode='r')
             gt_synapses = gt_db.read_synapses(pre_post_roi=roi_big)
-            gt_synapses = synapse.create_synapses_from_db(gt_synapses)
-            logger.debug('number of catmaid synapses: {}'.format(len(gt_synapses)))
-            for gt_syn in gt_synapses:
-                if seg.roi.contains(gt_syn.location_pre):
-                    seg_id = seg[daisy.Coordinate(gt_syn.location_pre)]
-                    seg_id_to_skel.setdefault(seg_id, [])
-                    seg_id_to_skel[seg_id].append(gt_syn.id_skel_pre)
-                    seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_pre), [])
-                    seg_skel_to_nodes[(seg_id,
-                                       gt_syn.id_skel_pre)].append(
-                        {'position': gt_syn.location_pre})
-                if seg.roi.contains(gt_syn.location_post):
-                    seg_id = seg[daisy.Coordinate(gt_syn.location_post)]
-                    seg_id_to_skel.setdefault(seg_id, [])
-                    seg_id_to_skel[seg_id].append(gt_syn.id_skel_post)
-                    seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_post), [])
-                    seg_skel_to_nodes[(seg_id,
-                                       gt_syn.id_skel_post)].append(
-                        {'position': gt_syn.location_post})
+            gt_synapses = pd.DataFrame(gt_synapses)
+            if len(gt_synapses) == 0:
+                logger.debug('No Ground Truth synapses')
+            else:
+                logger.info(
+                    'number of catmaid synapses: {}'.format(len(gt_synapses)))
+                pre_nodes = pd.DataFrame()
+                pre_nodes['neuron_id'] = gt_synapses['pre_skel_id']
+                pre_nodes['position'] = list(
+                    zip(gt_synapses['pre_z'], gt_synapses['pre_y'],
+                        gt_synapses['pre_x']))
+                pre_nodes['type'] = 'connector'
+                pre_nodes['id'] = gt_synapses.pre_node_id
 
-        for seg_id in seg_ids_ignore:
-            if seg_id in seg_id_to_skel:
-                del seg_id_to_skel[seg_id]
-        self.seg_id_to_skel = seg_id_to_skel
-        self.seg_skel_to_nodes = seg_skel_to_nodes
+                post_nodes = pd.DataFrame()
+                post_nodes['neuron_id'] = gt_synapses['post_skel_id']
+                post_nodes['position'] = list(
+                    zip(gt_synapses['post_z'], gt_synapses['post_y'],
+                        gt_synapses['post_x']))
+                post_nodes['type'] = 'post_tree_node'
+                post_nodes['id'] = gt_synapses.post_node_id
+
+                syn_nodes = pd.concat([pre_nodes, post_nodes])
+                syn_nodes = syn_nodes[syn_nodes.apply(
+                    lambda row: seg.roi.contains(daisy.Coordinate(row['position'])),
+                    axis=1)]
+                syn_nodes['seg_id'] = syn_nodes.apply(lambda row:
+                                                      seg[daisy.Coordinate(
+                                                          row['position'])], axis=1)
+                nodes_df = nodes_df.append(syn_nodes, sort=False)
+
+        nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
+        if len(nodes_df) == 0:
+            logger.info('Neither skeleton nor synapse node found.')
+            return 0
 
         pre_ids = [seg[pre_loc] for pre_loc in pre_locations]
         post_ids = [seg[post_loc] for post_loc in post_locations]
@@ -286,14 +318,16 @@ class SynapseMapping(object):
         for ii, syn in enumerate(synapses):
             pre_id = pre_ids[ii]
             post_id = post_ids[ii]
+
             # Test whether segment intersects with a skeleton
-            skel_syn_pre = seg_id_to_skel.get(pre_id, False)
-            skel_syn_post = seg_id_to_skel.get(post_id, False)
+            skel_syn_pre = not nodes_df[nodes_df.seg_id == pre_id].empty
+            skel_syn_post = not nodes_df[nodes_df.seg_id == post_id].empty
             if skel_syn_pre or skel_syn_post:
                 syn.id_segm_pre = pre_id
                 syn.id_segm_post = post_id
                 syn_on_skels.append(syn)
 
+        self.skel_df = nodes_df
         logger.debug(
             'matching {} synapses to skeletons, original number of synapses {}'.format(
                 len(syn_on_skels), len(synapses)))
@@ -323,16 +357,7 @@ class SynapseMapping(object):
                                            mode='r')
 
         nodes = gt_db.read_nodes()
-        seg_id_to_skel = {}
-        seg_skel_to_nodes = {}
-        for node in nodes:
-            seg_id_to_skel.setdefault(node['seg_id'], [])
-            seg_id_to_skel[node['seg_id']].append(node['neuron_id'])
-
-            seg_skel_to_nodes.setdefault((node['seg_id'], node['neuron_id']),
-                                         [])
-            seg_skel_to_nodes[(node['seg_id'], node['neuron_id'])].append(node)
-
+        nodes_df = pd.DataFrame(nodes)
 
         # Also add ground truth connectors.
         if self.gtsyn_db_name is not None:
@@ -341,35 +366,51 @@ class SynapseMapping(object):
                                              db_col_name=self.gtsyn_db_col,
                                              mode='r')
             gt_synapses = gt_db.read_synapses()
-            gt_synapses = synapse.create_synapses_from_db(gt_synapses)
-            logger.debug('number of catmaid synapses: {}'.format(len(gt_synapses)))
-            for gt_syn in gt_synapses:
+            gt_synapses = pd.DataFrame(gt_synapses)
+            use_tree_node = True
+            if not 'pre_node_id' in gt_synapses:
+                logger.warning(
+                    'No tree nodes available, assining new node ids. '
+                    'Neuron nodes and synapse nodes might be counted multiple times.')
+                use_tree_node = False
 
-                seg_id = gt_syn.id_segm_pre
-                seg_id_to_skel.setdefault(seg_id, [])
-                seg_id_to_skel[seg_id].append(gt_syn.id_skel_pre)
-                seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_pre), [])
-                seg_skel_to_nodes[(seg_id,
-                                   gt_syn.id_skel_pre)].append(
-                    {'position': gt_syn.location_pre})
+            if len(gt_synapses) == 0:
+                logger.debug('No Ground Truth synapses')
+            else:
+                logger.info(
+                    'number of catmaid synapses: {}'.format(len(gt_synapses)))
+                pre_nodes = pd.DataFrame()
+                pre_nodes['neuron_id'] = gt_synapses['pre_skel_id']
+                pre_nodes['position'] = list(
+                    zip(gt_synapses['pre_z'], gt_synapses['pre_y'],
+                        gt_synapses['pre_x']))
+                pre_nodes['type'] = 'connector'
+                pre_nodes['id'] = gt_synapses.pre_node_id if use_tree_node else list(range(len(gt_synapses)))
+                pre_nodes['seg_id'] = gt_synapses.pre_seg_id
 
-                seg_id = gt_syn.id_segm_post
-                seg_id_to_skel.setdefault(seg_id, [])
-                seg_id_to_skel[seg_id].append(gt_syn.id_skel_post)
-                seg_skel_to_nodes.setdefault((seg_id, gt_syn.id_skel_post), [])
-                seg_skel_to_nodes[(seg_id,
-                                   gt_syn.id_skel_post)].append(
-                    {'position': gt_syn.location_post})
+                post_nodes = pd.DataFrame()
+                post_nodes['neuron_id'] = gt_synapses['post_skel_id']
+                post_nodes['position'] = list(
+                    zip(gt_synapses['post_z'], gt_synapses['post_y'],
+                        gt_synapses['post_x']))
+                post_nodes['type'] = 'post_tree_node'
+                post_nodes['id'] = gt_synapses.post_node_id if use_tree_node else list(range(len(gt_synapses), 2*len(gt_synapses)))
+                post_nodes['seg_id'] = gt_synapses.post_seg_id
 
-        for seg_id in seg_ids_ignore:
-            if seg_id in seg_id_to_skel:
-                del seg_id_to_skel[seg_id]
-        self.seg_id_to_skel = seg_id_to_skel
-        self.seg_skel_to_nodes = seg_skel_to_nodes
+                syn_nodes = pd.concat([pre_nodes, post_nodes])
+                nodes_df = nodes_df.append(syn_nodes, sort=False)
 
+        nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
+        if len(nodes_df) == 0:
+            logger.info('Neither skeleton nor synapse node found.')
+            return 0
+        self.skel_df = nodes_df
+
+        seg_ids = list(np.unique(nodes_df.seg_id))
+        seg_ids = [int(id) for id in seg_ids]
         synapses = pred_db.synapses.find({'$or': [
-            {'pre_seg_id': {'$in': list(seg_id_to_skel.keys())}},
-            {'post_seg_id': {'$in': list(seg_id_to_skel.keys())}},
+            {'pre_seg_id': {'$in': seg_ids}},
+            {'post_seg_id': {'$in': seg_ids}},
         ]})
         synapses = synapse.create_synapses_from_db(synapses)
 

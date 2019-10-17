@@ -579,6 +579,13 @@ class SynapseDatabase(object):
 
             self.synapses.create_index(
                 [
+                    ('pre_node_id', ASCENDING),
+                    ('post_node_id', ASCENDING),
+                ],
+                name='node_ids')
+
+            self.synapses.create_index(
+                [
                     ('id', ASCENDING)
                 ],
                 name='id', unique=True)
@@ -618,9 +625,13 @@ class SynapseDatabase(object):
                 syn_dic['pre_skel_id'] = int(syn.id_skel_pre)
             if syn.id_skel_post is not None:
                 syn_dic['post_skel_id'] = int(syn.id_skel_post)
+            if syn.node_id_pre is not None:
+                syn_dic['pre_node_id'] = int(syn.node_id_pre)
+            if syn.node_id_post is not None:
+                syn_dic['post_node_id'] = int(syn.node_id_post)
             db_list.append(syn_dic)
 
-        write_size = 1000
+        write_size = 500
         for i in range(0, len(db_list), write_size):
             self.synapses.insert_many(db_list[i:i+write_size])
         logger.debug("Insert %d synapses" % len(synapses))
@@ -635,10 +646,8 @@ class SynapseDatabase(object):
             ``list`` of ``dic``: List of synapses in dictionary format.
         """
 
-        if roi is None:
-            logger.debug("No roi provided, querying all synapses in database")
-            synapses_dic = self.synapses.find()
-        elif roi is not None:
+
+        if roi is not None:
             logger.debug("Querying synapses in %s", roi)
             bz, by, bx = roi.get_begin()
             ez, ey, ex = roi.get_end()
@@ -650,8 +659,8 @@ class SynapseDatabase(object):
                 })
         elif pre_post_roi is not None:
             logger.debug("Querying synapses in %s", pre_post_roi)
-            bz, by, bx = roi.get_begin()
-            ez, ey, ex = roi.get_end()
+            bz, by, bx = pre_post_roi.get_begin()
+            ez, ey, ex = pre_post_roi.get_end()
             synapses_dic = self.synapses.find({'$or':
                 [
                     {
@@ -666,6 +675,10 @@ class SynapseDatabase(object):
                     }
                 ]}
             )
+        else:
+            logger.debug(
+                "No roi provided, querying all synapses in database")
+            synapses_dic = self.synapses.find()
 
         return synapses_dic
 

@@ -25,7 +25,8 @@ class Synapse(object):
 
     def __init__(self, id=None, id_segm_pre=None, id_segm_post=None,
                  location_pre=None, location_post=None, score=None,
-                 id_skel_pre=None, id_skel_post=None):
+                 id_skel_pre=None, id_skel_post=None, node_id_pre=None,
+                 node_id_post=None):
         self.id = id
         self.id_segm_pre = id_segm_pre
         self.id_segm_post = id_segm_post
@@ -33,6 +34,8 @@ class Synapse(object):
         self.location_post = location_post
         self.id_skel_pre = id_skel_pre
         self.id_skel_post = id_skel_post
+        self.node_id_pre = node_id_pre
+        self.node_id_post = node_id_post
         self.score = score
 
     def __repr__(self):
@@ -59,6 +62,8 @@ def create_synapses_from_db(synapses_dic):
         syn.id_skel_post = syn_dic.get('post_skel_id', None)
         syn.id_segm_pre = syn_dic.get('pre_seg_id', None)
         syn.id_segm_post = syn_dic.get('post_seg_id', None)
+        syn.node_id_pre = syn_dic.get('pre_node_id', None)
+        syn.node_id_post = syn_dic.get('post_node_id', None)
         syn.score = syn_dic.get('score', None)
 
         synapses.append(syn)
@@ -195,7 +200,8 @@ def write_synapses_into_cremiformat(synapses, filename, offset=None,
     logger.debug('File written to {}'.format(filename))
 
 
-def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
+def __find_redundant_synapses(synapses, dist_threshold, id_type,
+                              skeleton=None, ignore_ids=[]):
     pair_to_syns = {}
     for syn in synapses:
         if id_type == 'seg':
@@ -206,10 +212,12 @@ def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
             raise Exception('id_type {} not known'.format(id_type))
         if None in pair:
             continue
-        if pair in pair_to_syns:
+        ignore_pair = ignore_ids.count(pair[0]) > 0 or \
+                      ignore_ids.count(pair[1]) > 0
+
+        if not ignore_pair:
+            pair_to_syns.setdefault(pair, [])
             pair_to_syns[pair].append(syn)
-        else:
-            pair_to_syns[pair] = [syn]
 
     clusters = []
     for pair, syns in pair_to_syns.items():
@@ -264,7 +272,7 @@ def __find_cc_of_synapses(synapses, dist_threshold, skeleton=None):
 
 
 def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean',
-                     id_type='seg', skeleton=None):
+                     id_type='seg', skeleton=None, ignore_ids=[]):
     """ Match synapses with same seg ids in close euclidean distance or geodesic
     distance.
 
@@ -285,7 +293,9 @@ def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean',
 
     """
     clusters = __find_redundant_synapses(synapses, dist_threshold,
-                                         id_type=id_type, skeleton=skeleton)
+                                         id_type=id_type,
+                                         skeleton=skeleton,
+                                         ignore_ids=ignore_ids)
     id_to_synapses = {}
     for syn in synapses:
         assert syn.id is not None
