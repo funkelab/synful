@@ -200,7 +200,8 @@ def write_synapses_into_cremiformat(synapses, filename, offset=None,
     logger.debug('File written to {}'.format(filename))
 
 
-def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
+def __find_redundant_synapses(synapses, dist_threshold, id_type,
+                              skeleton=None, ignore_ids=[]):
     pair_to_syns = {}
     for syn in synapses:
         if id_type == 'seg':
@@ -211,10 +212,12 @@ def __find_redundant_synapses(synapses, dist_threshold, id_type, skeleton=None):
             raise Exception('id_type {} not known'.format(id_type))
         if None in pair:
             continue
-        if pair in pair_to_syns:
+        ignore_pair = ignore_ids.count(pair[0]) > 0 or \
+                      ignore_ids.count(pair[1]) > 0
+
+        if not ignore_pair:
+            pair_to_syns.setdefault(pair, [])
             pair_to_syns[pair].append(syn)
-        else:
-            pair_to_syns[pair] = [syn]
 
     clusters = []
     for pair, syns in pair_to_syns.items():
@@ -269,7 +272,7 @@ def __find_cc_of_synapses(synapses, dist_threshold, skeleton=None):
 
 
 def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean',
-                     id_type='seg', skeleton=None):
+                     id_type='seg', skeleton=None, ignore_ids=[]):
     """ Match synapses with same seg ids in close euclidean distance or geodesic
     distance.
 
@@ -290,7 +293,9 @@ def cluster_synapses(synapses, dist_threshold, fuse_strategy='mean',
 
     """
     clusters = __find_redundant_synapses(synapses, dist_threshold,
-                                         id_type=id_type, skeleton=skeleton)
+                                         id_type=id_type,
+                                         skeleton=skeleton,
+                                         ignore_ids=ignore_ids)
     id_to_synapses = {}
     for syn in synapses:
         assert syn.id is not None
