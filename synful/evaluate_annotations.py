@@ -47,7 +47,8 @@ class EvaluateAnnotations():
                  only_output_synapses=False, overwrite_summary=False,
                  seg_agglomeration_json=None,
                  roi_file=None, syn_dir=None,
-                 filter_redundant_dist_type='euclidean'):
+                 filter_redundant_dist_type='euclidean',
+                 filter_redundant_ignore_ids=[]):
         assert filter_redundant_id_type == 'seg' or filter_redundant_id_type == 'skel'
         assert filter_same_id_type == 'seg' or filter_same_id_type == 'skel'
         assert filter_redundant_dist_type == 'euclidean' or \
@@ -94,6 +95,8 @@ class EvaluateAnnotations():
         self.filter_same_id_type = filter_same_id_type
         self.filter_redundant_id_type = filter_redundant_id_type
         self.filter_redundant_dist_type = filter_redundant_dist_type
+        self.filter_redundant_ignore_ids = filter_redundant_ignore_ids
+
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
@@ -210,7 +213,8 @@ class EvaluateAnnotations():
                                                            self.filter_redundant_dist_thr,
                                                            fuse_strategy='max_score',
                                                            id_type=self.filter_redundant_id_type,
-                                                           skeleton=skeleton)
+                                                           skeleton=skeleton,
+                                                           ignore_ids=self.filter_redundant_ignore_ids)
                 pred_synapses = [syn for syn in pred_synapses if
                                  not syn.id in removed_ids]
                 num_clustered_synapses = num_synapses - len(pred_synapses)
