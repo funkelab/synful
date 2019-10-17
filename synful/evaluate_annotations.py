@@ -263,9 +263,9 @@ class EvaluateAnnotations():
             db_out[self.res_db_col + '.thr{}'.format(1000 * score_thr)].insert(
                 db_dic)
             pred_synapses_all.extend(pred_synapses)
-            logger.debug(f'skel id {skel_id} with fscore {fscore:0.2}, precision: {precision:0.2}, recall: {recall:0.2}')
-            logger.debug(f'fp: {fpcount}, fn: {fncount}')
-            logger.debug(f'total predicted {len(pred_synapses)}; total gt: {len(gt_synapses)}\n')
+            logger.info(f'skel id {skel_id} with fscore {fscore:0.2}, precision: {precision:0.2}, recall: {recall:0.2}')
+            logger.info(f'fp: {fpcount}, fn: {fncount}')
+            logger.info(f'total predicted {len(pred_synapses)}; total gt: {len(gt_synapses)}\n')
 
         # Alsow write out synapses:
         syn_out = database.SynapseDatabase(self.res_db_name,
