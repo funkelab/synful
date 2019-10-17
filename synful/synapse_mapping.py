@@ -258,8 +258,7 @@ class SynapseMapping(object):
                                      mode='r')
         nodes = gt_db.read_nodes(roi_context)
         logger.info('number of skel nodes {}'.format(len(nodes)))
-        if len(nodes) == 0:
-            return 0
+
 
         logger.debug('creating a local segmentation')
         locseg = local_segmentation.LocalSegmentationExtractor(**seg_config)
@@ -309,6 +308,9 @@ class SynapseMapping(object):
                 nodes_df = nodes_df.append(syn_nodes, sort=False)
 
         nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
+        if len(nodes_df) == 0:
+            logger.info('Neither skeleton nor synapse node found.')
+            return 0
 
         pre_ids = [seg[pre_loc] for pre_loc in pre_locations]
         post_ids = [seg[post_loc] for post_loc in post_locations]
