@@ -282,6 +282,12 @@ class SynapseMapping(object):
                                              mode='r')
             gt_synapses = gt_db.read_synapses(pre_post_roi=roi_big)
             gt_synapses = pd.DataFrame(gt_synapses)
+            use_tree_node = True
+            if not 'pre_node_id' in gt_synapses:
+                logger.warning(
+                    'No tree nodes available, assining new node ids. '
+                    'Neuron nodes and synapse nodes might be counted multiple times.')
+                use_tree_node = False
             if len(gt_synapses) == 0:
                 logger.debug('No Ground Truth synapses')
             else:
@@ -293,7 +299,7 @@ class SynapseMapping(object):
                     zip(gt_synapses['pre_z'], gt_synapses['pre_y'],
                         gt_synapses['pre_x']))
                 pre_nodes['type'] = 'connector'
-                pre_nodes['id'] = gt_synapses.pre_node_id
+                pre_nodes['id'] = gt_synapses.pre_node_id if use_tree_node else list(range(len(gt_synapses)))
 
                 post_nodes = pd.DataFrame()
                 post_nodes['neuron_id'] = gt_synapses['post_skel_id']
@@ -301,7 +307,7 @@ class SynapseMapping(object):
                     zip(gt_synapses['post_z'], gt_synapses['post_y'],
                         gt_synapses['post_x']))
                 post_nodes['type'] = 'post_tree_node'
-                post_nodes['id'] = gt_synapses.post_node_id
+                post_nodes['id'] = gt_synapses.post_node_id if use_tree_node else list(range(len(gt_synapses), 2*len(gt_synapses)))
 
                 syn_nodes = pd.concat([pre_nodes, post_nodes])
                 syn_nodes = syn_nodes[syn_nodes.apply(
