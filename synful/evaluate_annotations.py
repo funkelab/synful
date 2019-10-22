@@ -332,7 +332,10 @@ class EvaluateAnnotations():
         settings['only_input_synapses'] = self.only_input_synapses
         settings['num_clustered_synapses'] = num_clustered_synapsesall
         settings['filter_redundant_dist_type'] = self.filter_redundant_dist_type
-        settings['new_score_db'] = self.syn_score_db
+        settings['new_score_db'] = self.syn_score_db['db_name'] + \
+                                   self.syn_score_db[
+                                       'db_col_name'] if self.syn_score_db is not None else 'original score'
+
         result_dic.update(settings)
 
         db_out[self.res_db_col_summary].insert_one(result_dic)
