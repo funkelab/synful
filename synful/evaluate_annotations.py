@@ -5,6 +5,7 @@ import multiprocessing as mp
 import os
 import sys
 import scipy
+import pandas as pd
 
 import daisy
 import numpy as np
@@ -48,7 +49,7 @@ class EvaluateAnnotations():
                  seg_agglomeration_json=None,
                  roi_file=None, syn_dir=None,
                  filter_redundant_dist_type='euclidean',
-                 filter_redundant_ignore_ids=[]):
+                 filter_redundant_ignore_ids=[], syn_score_db=None):
         assert filter_redundant_id_type == 'seg' or filter_redundant_id_type == 'skel'
         assert filter_same_id_type == 'seg' or filter_same_id_type == 'skel'
         assert filter_redundant_dist_type == 'euclidean' or \
@@ -96,6 +97,7 @@ class EvaluateAnnotations():
         self.filter_redundant_id_type = filter_redundant_id_type
         self.filter_redundant_dist_type = filter_redundant_dist_type
         self.filter_redundant_ignore_ids = filter_redundant_ignore_ids
+        self.syn_score_db = syn_score_db
 
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
@@ -191,6 +193,16 @@ class EvaluateAnnotations():
                         self.only_output_synapses, self.only_input_synapses))
 
             pred_synapses = synapse.create_synapses_from_db(pred_synapses)
+            if self.syn_score_db is not None:
+                score_host = self.syn_score_db['db_host']
+                score_db = self.syn_score_db['db_name']
+                score_col = self.syn_score_db['db_col_name']
+                score_db = MongoClient(host=score_host)[score_db][score_col]
+                score_cursor = score_db.find({'synful_id': {'$in': [syn.id for syn in pred_synapses]}})
+                df = pd.DataFrame(score_cursor)
+                for syn in pred_synapses:
+                    syn.score = float(df[df.synful_id == syn.id].score)
+
             pred_synapses = [syn for syn in pred_synapses if
                              syn.score > score_thr]
             if self.filter_same_id:
@@ -320,6 +332,7 @@ class EvaluateAnnotations():
         settings['only_input_synapses'] = self.only_input_synapses
         settings['num_clustered_synapses'] = num_clustered_synapsesall
         settings['filter_redundant_dist_type'] = self.filter_redundant_dist_type
+        settings['new_score_db'] = self.syn_score_db
         result_dic.update(settings)
 
         db_out[self.res_db_col_summary].insert_one(result_dic)
