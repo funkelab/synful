@@ -212,7 +212,7 @@ class EvaluateAnnotations():
                 elif self.filter_same_id_type == 'skel':
                     pred_synapses = [syn for syn in pred_synapses if
                                      syn.id_skel_pre != syn.id_skel_post]
-
+            removed_ids = []
             if self.filter_redundant:
                 assert self.filter_redundant_dist_thr is not None
                 num_synapses = len(pred_synapses)
