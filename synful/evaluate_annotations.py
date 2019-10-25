@@ -49,7 +49,8 @@ class EvaluateAnnotations():
                  seg_agglomeration_json=None,
                  roi_file=None, syn_dir=None,
                  filter_redundant_dist_type='euclidean',
-                 filter_redundant_ignore_ids=[], syn_score_db=None, syn_score_db_comb=None):
+                 filter_redundant_ignore_ids=[], syn_score_db=None,
+                 syn_score_db_comb=None, filter_seg_ids=[]):
         assert filter_redundant_id_type == 'seg' or filter_redundant_id_type == 'skel'
         assert filter_same_id_type == 'seg' or filter_same_id_type == 'skel'
         assert filter_redundant_dist_type == 'euclidean' or \
@@ -99,6 +100,7 @@ class EvaluateAnnotations():
         self.filter_redundant_ignore_ids = filter_redundant_ignore_ids
         self.syn_score_db = syn_score_db
         self.syn_score_db_comb = syn_score_db_comb
+        self.filter_seg_ids = filter_seg_ids
 
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
@@ -193,7 +195,14 @@ class EvaluateAnnotations():
                     'Unclear parameter configuration: {}, {}'.format(
                         self.only_output_synapses, self.only_input_synapses))
 
+
+
+
+
             pred_synapses = synapse.create_synapses_from_db(pred_synapses)
+            if not len(self.filter_seg_ids) == 0:
+                pred_synapses = [syn for syn in pred_synapses if not (
+                            syn.id_segm_pre in self.filter_seg_ids or syn.id_segm_post in self.filter_seg_ids)]
             if self.syn_score_db is not None:
                 score_host = self.syn_score_db['db_host']
                 score_db = self.syn_score_db['db_name']
@@ -349,6 +358,7 @@ class EvaluateAnnotations():
         if self.syn_score_db_comb is not None and new_score_db_name is not None:
             new_score_db_name += self.syn_score_db_comb
         settings['new_score_db'] = new_score_db_name
+        settings['filter_seg_ids'] = self.filter_seg_ids if len(self.filter_seg_ids) != 0 else False
 
         result_dic.update(settings)
 
