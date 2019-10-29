@@ -99,6 +99,9 @@ class EvaluateAnnotations():
         self.filter_redundant_dist_type = filter_redundant_dist_type
         self.filter_redundant_ignore_ids = filter_redundant_ignore_ids
         self.syn_score_db = syn_score_db
+        if syn_score_db is None:
+            assert syn_score_db_comb is None, 'syn_score_db_comb is set, although syn_score_db is not set, unclear what to do.'
+
         self.syn_score_db_comb = syn_score_db_comb
         self.filter_seg_ids = filter_seg_ids
 
