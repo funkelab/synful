@@ -1,5 +1,6 @@
 import logging
 import json
+import numpy as np
 
 from pymongo import MongoClient, ASCENDING, TEXT
 
@@ -606,8 +607,9 @@ class SynapseDatabase(object):
 
         db_list = []
         for syn in synapses:
+            assert syn.id == np.int64(syn.id)
             syn_dic = {
-                'id': int(syn.id),
+                'id': int(np.int64(syn.id)),
                 'pre_z': int(syn.location_pre[0]),
                 'pre_y': int(syn.location_pre[1]),
                 'pre_x': int(syn.location_pre[2]),
