@@ -358,7 +358,7 @@ class EvaluateAnnotations():
         if self.syn_score_db_comb is not None and new_score_db_name is not None:
             new_score_db_name += self.syn_score_db_comb
         settings['new_score_db'] = new_score_db_name
-        settings['filter_seg_ids'] = self.filter_seg_ids if len(self.filter_seg_ids) != 0 else False
+        settings['filter_seg_ids'] = str(self.filter_seg_ids)
 
         result_dic.update(settings)
 
