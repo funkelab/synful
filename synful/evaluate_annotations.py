@@ -23,7 +23,7 @@ def csv_to_list(csvfilename, column):
     with open(csvfilename) as csvfile:
         data = list(csv.reader(csvfile))
     col_list = []
-    for ii in range(1, len(data)):
+    for ii in range(column, len(data)):
         row = data[ii]
         col_list.append(int(row[column]))
     return col_list
@@ -290,6 +290,8 @@ class EvaluateAnnotations():
                 'tp_gt': [syn.id for syn in tp_syns_gt],
                 'fp_pred': [syn.id for syn in fp_syns],
                 'fn_gt': [syn.id for syn in fn_syns_gt],
+                'gtcount': len(gt_synapses),
+                'predcount': len(pred_synapses),
                 'matched_synapse_ids': matched_synapse_ids,
                 'fscore': stats[0],
                 'precision': stats[1],
@@ -306,13 +308,17 @@ class EvaluateAnnotations():
             logger.info(f'fp: {fpcount}, fn: {fncount}')
             logger.info(f'total predicted {len(pred_synapses)}; total gt: {len(gt_synapses)}\n')
 
-        # Alsow write out synapses:
+        # # Alsow write out synapses:
+        pred_dic = {}
+        for syn in pred_synapses_all:
+            pred_dic[syn.id] = syn
+        print('Number of duplicated syn ids: {} versus {}'.format(len(pred_synapses_all), len(pred_dic)))
         syn_out = database.SynapseDatabase(self.res_db_name,
                                            db_host=self.res_db_host,
                                            db_col_name=self.res_db_col + '.syn_thr{}'.format(
                                                1000 * score_thr),
                                            mode='w')
-        syn_out.write_synapses(pred_synapses_all)
+        syn_out.write_synapses(pred_dic.values())
 
         precision = float(tpcountall) / (tpcountall + fpcountall) if (
                                                                              tpcountall + fpcountall) > 0 else 0.
