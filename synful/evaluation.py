@@ -121,8 +121,8 @@ def synaptic_partners_fscore(rec_annotations, gt_annotations,
     assert fncountall == len(fn_syns_gt_all)
     assert fpcountall == len(fp_syns_all)
     assert len(tp_syns_gt_all) == len(tp_syns_all)
-    precision = float(tp) / (tp + fp) if (tp + fp) > 0 else 0.
-    recall = float(tp) / (tp + fn) if (tp + fn) > 0 else 0.
+    precision = float(tp) / (tp + fp) if (tp + fp) > 0 else 1.
+    recall = float(tp) / (tp + fn) if (tp + fn) > 0 else 1.
     if (precision + recall) > 0:
         fscore = 2.0 * precision * recall / (precision + recall)
     else:
