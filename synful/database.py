@@ -633,7 +633,7 @@ class SynapseDatabase(object):
                 syn_dic['post_node_id'] = int(syn.node_id_post)
             db_list.append(syn_dic)
 
-        write_size = 500
+        write_size = 100
         for i in range(0, len(db_list), write_size):
             self.synapses.insert_many(db_list[i:i+write_size])
         logger.debug("Insert %d synapses" % len(synapses))
