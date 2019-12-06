@@ -67,8 +67,8 @@ class EvaluateAnnotations():
         self.distance_upper_bound = distance_upper_bound
         self.matching_threshold = matching_threshold
         self.skeleton_ids = skeleton_ids
-        self.output_db_col = self.pred_db_col + '_skel_{}'.format('inf' if
-                                                                  distance_upper_bound is None else distance_upper_bound)
+        # self.output_db_col = self.pred_db_col + '_skel_{}'.format('inf' if
+        #                                                           distance_upper_bound is None else distance_upper_bound)
 
         self.multiprocess = multiprocess
 
@@ -164,7 +164,7 @@ class EvaluateAnnotations():
 
         pred_db = database.SynapseDatabase(self.pred_db,
                                            db_host=self.pred_db_host,
-                                           db_col_name=self.output_db_col,
+                                           db_col_name=self.pred_db_col,
                                            mode='r')
 
         client_out = MongoClient(self.res_db_host)
@@ -227,7 +227,7 @@ class EvaluateAnnotations():
 
 
             pred_synapses = [syn for syn in pred_synapses if
-                             syn.score > score_thr]
+                             syn.score >= score_thr]
             if self.filter_same_id:
                 if self.filter_same_id_type == 'seg':
                     pred_synapses = [syn for syn in pred_synapses if
@@ -272,6 +272,7 @@ class EvaluateAnnotations():
                                                         use_only_post=self.matching_threshold_only_post)
             fscore, precision, recall, fpcount, fncount, tp_fp_fn_syns = stats
 
+
             # tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = evaluation.from_synapsematches_to_syns(
             #     matches, pred_synapses, gt_synapses)
             tp_syns, fp_syns, fn_syns_gt, tp_syns_gt = tp_fp_fn_syns
@@ -284,6 +285,7 @@ class EvaluateAnnotations():
             predall += len(pred_synapses)
             gtall += len(gt_synapses)
             num_clustered_synapsesall += num_clustered_synapses
+
             db_dic = {
                 'skel_id': skel_id,
                 'tp_pred': [syn.id for syn in tp_syns],
