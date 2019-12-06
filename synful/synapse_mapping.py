@@ -259,6 +259,18 @@ class SynapseMapping(object):
                                      mode='r')
         nodes = gt_db.read_nodes(roi_context)
         logger.info('number of skel nodes {}'.format(len(nodes)))
+        if self.gtsyn_db_name is not None:
+            gt_db = database.SynapseDatabase(self.gtsyn_db_name,
+                                             db_host=self.gtsyn_db_host,
+                                             db_col_name=self.gtsyn_db_col,
+                                             mode='r')
+            gt_synapses = gt_db.read_synapses(pre_post_roi=roi_big)
+            gt_synapses = pd.DataFrame(gt_synapses)
+        else:
+            gt_synapses = pd.DataFrame([])
+        if len(nodes) == 0 and len(gt_synapses) == 0:
+            logger.info('Neither skeleton nor synapse node found.')
+            return 0
 
 
         logger.debug('creating a local segmentation')
@@ -276,12 +288,6 @@ class SynapseMapping(object):
 
         # # Also add ground truth connectors.
         if self.gtsyn_db_name is not None:
-            gt_db = database.SynapseDatabase(self.gtsyn_db_name,
-                                             db_host=self.gtsyn_db_host,
-                                             db_col_name=self.gtsyn_db_col,
-                                             mode='r')
-            gt_synapses = gt_db.read_synapses(pre_post_roi=roi_big)
-            gt_synapses = pd.DataFrame(gt_synapses)
             use_tree_node = True
             if not 'pre_node_id' in gt_synapses:
                 logger.warning(
@@ -319,9 +325,9 @@ class SynapseMapping(object):
                 nodes_df = nodes_df.append(syn_nodes, sort=False)
 
 
-        if len(nodes_df) == 0:
-            logger.info('Neither skeleton nor synapse node found.')
-            return 0
+        # if len(nodes_df) == 0:
+        #     logger.info('Neither skeleton nor synapse node found.')
+        #     return 0
         nodes_df = nodes_df[~nodes_df.seg_id.isin(seg_ids_ignore)]
 
         pre_ids = [seg[pre_loc] for pre_loc in pre_locations]
