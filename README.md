@@ -23,7 +23,6 @@ The pipeline processes 3D raw data in two steps into synaptic partners:
   1) inference of a) `syn_indicator_mask` (postsynaptic locations) and b) `direction_vector` (vector pointing from postsynaptic location to its presynaptic partner)
   2) synapse extraction: a) locations extractions based on `syn_indicator_mask` and b) finding presynaptic partner based on `direction_vector`
 
-For CREMI-like (FAFB) data (anisotropic EM data from the Fruit Fly), pretrained models are available. For all other data, models need to be trained from scratch.
 
 ![method_figure](docs/_static/method_overview.png)
 
@@ -35,4 +34,5 @@ Train scripts will be added soon.
 
 Inference
 --------
-Will be added soon.
+
+Inference scripts will be added soon.
