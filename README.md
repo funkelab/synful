@@ -4,15 +4,14 @@ Overview
 --------
 Synful: A project for the automated detection of synaptic partners in Electron Microscopy brain data using U-Nets (type of Convolutional Neural Network).
 
-This repos provides train and predict scripts for synaptic partner detection. For more details, see the underlying publication:
+This repos provides train and predict scripts for synaptic partner detection. For more details, see the following publication:
 
 - [Automatic Detection of Synaptic Partners in a Whole-Brain Drosophila EM Dataset](biorxiv link)
 
-
 We used the method to predict 244 Million synaptic partners in the full adult fly brain (FAFB) dataset.
-Please see https://github.com/funkelab/synfulfafb for data dissemination, and benchmark datasets.
+Please see https://github.com/funkelab/synful_fafb for data dissemination, and benchmark datasets.
 
-Note, that this repos is work-in-progress. Please don't hesitate to file an issue or write us an email if something is unclear.
+Note, that this repos is work-in-progress. Please don't hesitate to create an issue or write us an email if something is unclear.
 
 - [ ] Add train scripts
 - [ ] Add inference scripts
@@ -31,19 +30,7 @@ For CREMI-like (FAFB) data (anisotropic EM data from the Fruit Fly), pretrained 
 Training
 --------
 
-Training scripts are found in
-
-```
-examples/training/<setup>/
-```
-
-where `<setup>` is the name of a particular network configuration.
-In such a <setup> directory, you will find three files:
-- `train.py` (call to start training)
-- `generate_network.py` (is called by train.py and generates tensorflow train network)
-- `predict.py` (script used for inference)
-
-To get started, have a look at the train script in [examples/training/train.py](02_train/base).
+Train scripts will be added soon.
 
 
 Inference
