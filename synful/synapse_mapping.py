@@ -3,17 +3,34 @@ import logging
 import multiprocessing as mp
 import sys
 import pandas as pd
+import random
 
 import daisy
 import numpy as np
 from lsd import local_segmentation
 from pymongo import MongoClient
 from scipy.spatial import KDTree
+import sqlite3
+from funlib.math import cantor_number
+
 
 from . import database, synapse, evaluation
 
 logger = logging.getLogger(__name__)
 
+def get_random_links(num_samples, cursor, table='synlinks', fast=False):
+    cols = ['pre_x', 'pre_y', 'pre_z', 'post_x', 'post_y',
+            'post_z', 'scores', 'segmentid_pre', 'segmentid_post',
+            'cleft_scores']
+    if fast:
+        com = 'SELECT {} FROM {} WHERE random() % 1000 = 0 LIMIT {};'.format(
+            ','.join(cols), table, num_samples)
+    else:
+        com = 'SELECT {} FROM {} ORDER BY Random() LIMIT {};'.format(
+            ','.join(cols), table, num_samples)
+
+    cursor.execute(com)
+    return pd.DataFrame(cursor.fetchall(), columns=cols)
 
 class SynapseMapping(object):
     '''Maps synapses to ground truth skeletons and writes them into a
@@ -62,6 +79,14 @@ class SynapseMapping(object):
             number of skeletons: num_skel_nodes_ignore or less. This is used
             to account for noisy/incorrectly placed skeleton nodes, which
             should be ignored during mapping.
+        draw_random_from_sql (``str``): sql database, from which randomly
+            synapses are drawn. If this is set, syn_db_name is not used, instead,
+            synapse direction vectors are drawn at random from provided database.
+            Can be used to generate a "baseline" experiment. Only synapses are
+            written out that have different pre and post segmentation ids
+            (to reduce #of synapses).
+        random_density (``float``): if draw_random_sql is set, provide the
+            density in # synapses / cubic micron
 
     '''
 
@@ -73,8 +98,8 @@ class SynapseMapping(object):
                  gtsyn_db_col=None,
                  seg_agglomeration_json=None,
                  distance_upper_bound=None, num_skel_nodes_ignore=0,
-                 multiprocess=False):
-        assert syndir is not None or syn_db_col is not None, 'synapses have to be ' \
+                 multiprocess=False, draw_random_from_sql=None, random_density=10):
+        assert syndir is not None or syn_db_col is not None or draw_random_from_sql is not None, 'synapses have to be ' \
                                                          'provided either in syndir format or db format'
 
         self.skel_db_name = skel_db_name
@@ -97,6 +122,8 @@ class SynapseMapping(object):
         self.num_skel_nodes_ignore = num_skel_nodes_ignore
         self.multiprocess = multiprocess
         self.skel_df = pd.DataFrame()
+        self.draw_random_from_sql = draw_random_from_sql
+        self.random_density = random_density
 
     def __match_position_to_closest_skeleton(self, position, seg_id, skel_ids):
         distances = []
@@ -190,6 +217,8 @@ class SynapseMapping(object):
                                           db_host=self.output_db_host,
                                           db_col_name=self.output_db_col,
                                           mode='r+')
+        if self.draw_random_from_sql is not None:
+            synapses = [syn for syn in synapses if syn.id_segm_pre != syn.id_segm_post]
         syn_db.write_synapses(synapses)
 
     def add_skel_ids_daisy(self, roi_core, roi_context, seg_thr,
@@ -218,16 +247,46 @@ class SynapseMapping(object):
 
         # This reads in all synapses, where postsynaptic site is in ROI, but
         # it is not guaranteed, that presynaptic site is also in ROI.
-        if self.syndir is not None:
-            synapses = synapse.read_synapses_in_roi(self.syndir,
-                                                    roi_core)
+        if self.draw_random_from_sql is None:
+            if self.syndir is not None:
+                synapses = synapse.read_synapses_in_roi(self.syndir,
+                                                        roi_core)
+            else:
+                syn_db = database.SynapseDatabase(self.syn_db_name,
+                                                  db_host=self.syn_db_host,
+                                                  db_col_name=self.syn_db_col,
+                                                  mode='r')
+                synapses = syn_db.read_synapses(roi=roi_core)
+                synapses = synapse.create_synapses_from_db(synapses)
         else:
-            syn_db = database.SynapseDatabase(self.syn_db_name,
-                                              db_host=self.syn_db_host,
-                                              db_col_name=self.syn_db_col,
-                                              mode='r')
-            synapses = syn_db.read_synapses(roi=roi_core)
-            synapses = synapse.create_synapses_from_db(synapses)
+            size_cubmicrons = roi_core.size()/1000**3
+            num_of_synapses = int(size_cubmicrons*self.random_density)
+
+            # Generate num_of_synapses postsynaptic random locations.
+            # if N of possible points gets really big, this solution is not nice :(
+            zlist = range(int(roi_core.get_begin()[0]/seg.voxel_size[0]), int(roi_core.get_end()[0]/seg.voxel_size[0]))
+            ylist = range(int(roi_core.get_begin()[1]/seg.voxel_size[1]), int(roi_core.get_end()[1]/seg.voxel_size[1]))
+            xlist = range(int(roi_core.get_begin()[2]/seg.voxel_size[2]), int(roi_core.get_end()[2]/seg.voxel_size[2]))
+            coords = [[z, y, x] for x in xlist for y in ylist for z in zlist]
+            post_sites = random.sample(coords, num_of_synapses)
+            conn = sqlite3.connect(self.draw_random_from_sql)
+            c = conn.cursor()
+            links = get_random_links(num_of_synapses, c) # returns pandas dataframe
+            synapses = []
+            for ii, location_post in enumerate(post_sites):
+                id = cantor_number(location_post)
+                location_post *= np.array(seg.voxel_size)
+                link = links.loc[ii]
+                dir_vec = np.array((link.pre_z, link.pre_y, link.pre_x))-np.array((link.post_z, link.post_y, link.post_x))
+                syn = synapse.Synapse(
+                    id=np.int64(id),
+                    score=link.scores,
+                    location_pre=location_post+dir_vec,
+                    location_post=location_post
+                )
+                synapses.append(syn)
+
+
 
         # Make sure to only look at synapses that are inside segmentation ROI.
         synapses = [syn for syn in synapses if
