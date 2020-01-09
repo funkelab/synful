@@ -26,6 +26,20 @@ The pipeline processes 3D raw data in two steps into synaptic partners:
 
 ![method_figure](docs/_static/method_overview.png)
 
+Installation
+------------
+from source (creating a conda env is optional, but recommended).
+- Clone this github repos.
+- In a shell:
+
+```bash
+conda create -n <conda_env_name> python=3.6
+source activate <conda_env_name>
+cd synful
+pip install -r requirements.txt
+python setup.py install
+```
+
 Training
 --------
 
