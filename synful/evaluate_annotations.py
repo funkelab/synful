@@ -29,6 +29,17 @@ def csv_to_list(csvfilename, column):
     return col_list
 
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NpEncoder, self).default(obj)
+
 class EvaluateAnnotations():
 
     def __init__(self, pred_db_name, pred_db_host, pred_db_col,
@@ -393,3 +404,78 @@ class EvaluateAnnotations():
         else:
             for score_thr in score_thresholds:
                 self.get_cremi_score(score_thr)
+
+    def dump_to_json(self, outputdir, filetag=''):
+        gt_db = database.SynapseDatabase(self.gt_db_name,
+                                         db_host=self.gt_db_host,
+                                         db_col_name=self.gt_db_col,
+                                         mode='r')
+
+        pred_db = database.SynapseDatabase(self.pred_db,
+                                           db_host=self.pred_db_host,
+                                           db_col_name=self.pred_db_col,
+                                           mode='r')
+        skel_ids = csv_to_list(self.skeleton_ids, 0)
+
+        if not self.only_output_synapses and not self.only_input_synapses:
+            pred_synapses = pred_db.synapses.find(
+                {'$or': [{'pre_skel_id': {'$in': skel_ids}},
+                         {'post_skel_id': {'$in': skel_ids}}]})
+            gt_synapses = gt_db.synapses.find(
+                {'$or': [{'pre_skel_id': {'$in': skel_ids}},
+                         {'post_skel_id': {'$in': skel_ids}}]})
+
+        elif self.only_input_synapses:
+            pred_synapses = pred_db.synapses.find(
+                {'post_skel_id': {'$in': skel_ids}})
+            gt_synapses = gt_db.synapses.find(
+                {'post_skel_id': {'$in': skel_ids}})
+        elif self.only_output_synapses:
+            pred_synapses = pred_db.synapses.find(
+                {'pre_skel_id': {'$in': skel_ids}})
+            gt_synapses = gt_db.synapses.find(
+                {'pre_skel_id': {'$in': skel_ids}})
+        else:
+            raise Exception(
+                'Unclear parameter configuration: {}, {}'.format(
+                    self.only_output_synapses, self.only_input_synapses))
+
+        pred_synapses = synapse.create_synapses_from_db(pred_synapses)
+        gt_synapses = synapse.create_synapses_from_db(gt_synapses)
+
+        logger.info(
+            'Writing {} of gt synapses and {} of predicted synapses'.format(
+                len(gt_synapses), len(pred_synapses)))
+
+        pred_outputfile = os.path.join(outputdir,
+                                       '{}{}_pred.json'.format(self.pred_db,
+                                                               filetag))
+        gt_outputfile = os.path.join(outputdir, '{}{}_gt.json'.format(
+            self.pred_db, filetag))
+        logger.info(
+            'Writing {} of gt synapses and {} of predicted synapses. Writing to {} and {}'.format(
+                len(gt_synapses), len(pred_synapses), gt_outputfile,
+                pred_outputfile))
+        # Only write out skel ids and locations.
+        with open(pred_outputfile, 'w') as f:
+            json.dump(
+                [{'id': int(syn.id), 'id_skel_pre': int(
+                    syn.id_skel_pre) if syn.id_skel_pre is not None else syn.id_skel_pre,
+                  'id_skel_post':
+                      int(
+                          syn.id_skel_post) if syn.id_skel_post is not None else syn.id_skel_post,
+                  'location_pre': tuple(syn.location_pre.astype(int)),
+                  'location_post': tuple(syn.location_post.astype(int)),
+                  'score': syn.score,
+                  'id_segm_pre': syn.id_segm_pre,
+                  'id_segm_post': syn.id_segm_post}
+                 for syn in pred_synapses], f, cls=NpEncoder)
+
+        with open(gt_outputfile, 'w') as f:
+            json.dump(
+                [{'id': int(syn.id), 'id_skel_pre': syn.id_skel_pre,
+                  'id_skel_post':
+                      int(syn.id_skel_post),
+                  'location_pre': tuple(syn.location_pre),
+                  'location_post': tuple(syn.location_post)} for syn in
+                 gt_synapses], f, cls=NpEncoder)
