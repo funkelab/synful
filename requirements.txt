@@ -1,6 +1,9 @@
 numpy
 pymongo
 zarr
+pandas
+pymaid
+neuroglancer
 git+git://github.com/funkelab/daisy@0d5d38a17d7250979284ace369bd71b89d004c97#egg=daisy
 git+git://github.com/funkelab/funlib.math@0c623f71c083d33184cac40ef7b1b995216be8ef#egg=funlib.math
 git+git://github.com/funkelab/funlib.run@959f3d4401a3b25979150bd7c3fabd46d6994069#egg=funlib.run
