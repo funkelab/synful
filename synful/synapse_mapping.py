@@ -83,7 +83,7 @@ class SynapseMapping(object):
             synapses are drawn. If this is set, syn_db_name is not used, instead,
             synapse direction vectors are drawn at random from provided database.
             Can be used to generate a "baseline" experiment. Only synapses are
-            written out that have different pre and post segmentation ids
+            written out that have different pre and post skeleton ids
             (to reduce #of synapses).
         random_density (``float``): if draw_random_sql is set, provide the
             density in # synapses / cubic micron
@@ -218,7 +218,7 @@ class SynapseMapping(object):
                                           db_col_name=self.output_db_col,
                                           mode='r+')
         if self.draw_random_from_sql is not None:
-            synapses = [syn for syn in synapses if syn.id_segm_pre != syn.id_segm_post]
+            synapses = [syn for syn in synapses if syn.id_skel_pre != syn.id_skel_post]
         syn_db.write_synapses(synapses)
 
     def add_skel_ids_daisy(self, roi_core, roi_context, seg_thr,
