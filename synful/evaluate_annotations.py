@@ -405,7 +405,7 @@ class EvaluateAnnotations():
             for score_thr in score_thresholds:
                 self.get_cremi_score(score_thr)
 
-    def dump_to_json(self, outputdir, filetag=''):
+    def dump_to_json(self, outputdir, filetag='', offset=(0, 0, 0)):
         gt_db = database.SynapseDatabase(self.gt_db_name,
                                          db_host=self.gt_db_host,
                                          db_col_name=self.gt_db_col,
@@ -464,8 +464,8 @@ class EvaluateAnnotations():
                   'id_skel_post':
                       int(
                           syn.id_skel_post) if syn.id_skel_post is not None else syn.id_skel_post,
-                  'location_pre': tuple(syn.location_pre.astype(int)),
-                  'location_post': tuple(syn.location_post.astype(int)),
+                  'location_pre': tuple(syn.location_pre+offset),
+                  'location_post': tuple(syn.location_post+offset),
                   'score': syn.score,
                   'id_segm_pre': syn.id_segm_pre,
                   'id_segm_post': syn.id_segm_post}
@@ -476,6 +476,6 @@ class EvaluateAnnotations():
                 [{'id': int(syn.id), 'id_skel_pre': syn.id_skel_pre,
                   'id_skel_post':
                       int(syn.id_skel_post),
-                  'location_pre': tuple(syn.location_pre),
-                  'location_post': tuple(syn.location_post)} for syn in
+                  'location_pre': tuple(syn.location_pre+offset),
+                  'location_post': tuple(syn.location_post+offset)} for syn in
                  gt_synapses], f, cls=NpEncoder)
