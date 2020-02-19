@@ -1,6 +1,7 @@
 numpy
 pymongo
 zarr
+sklearn
 pandas
 pymaid
 neuroglancer==1.1.2
