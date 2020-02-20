@@ -120,6 +120,7 @@ class Hdf5PointsSource(BatchProvider):
                 logger.debug("Reading %s in %s...", points_key, request_spec.roi)
                 points_spec = self.spec[points_key].copy()
                 points_spec.roi = request_spec.roi
+                logger.debug("Number of points len()".format(len(points[points_key])))
                 batch.points[points_key] = Points(data=points[points_key], spec=points_spec)
 
         timing_process.stop()
@@ -131,6 +132,12 @@ class Hdf5PointsSource(BatchProvider):
         presyn_points_dict, postsyn_points_dict = {}, {}
         annotation_ids = syn_file['annotations/ids'][:]
         locs = syn_file['annotations/locations'][:]
+        if 'offset' in syn_file['annotations'].attrs:
+            offset = np.array(syn_file['annotations'].attrs['offset'])
+            logger.debug("Retrieving offset")
+        else:
+            offset = None
+            logger.debug('No offset')
         syn_id = 0
         for pre, post in list(
                 syn_file['annotations/presynaptic_site/partners'][:]):
@@ -138,6 +145,9 @@ class Hdf5PointsSource(BatchProvider):
             post_index = int(np.where(post == annotation_ids)[0][0])
             pre_site = locs[pre_index]
             post_site = locs[post_index]
+            if offset is not None:
+                pre_site += offset
+                post_site += offset
 
             if pre_roi.contains(Coordinate(pre_site)):
                 syn_point = PreSynPoint(location=pre_site,
