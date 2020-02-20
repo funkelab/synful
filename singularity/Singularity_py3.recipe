@@ -52,6 +52,9 @@ From: ubuntu:18.04
     conda install tensorflow-gpu=1.14 cudatoolkit=10.0
     conda install pandas
 
+    # pip install git+git://github.com/schlegelp/pymaid@e95c897deca794ae928675ab73a663c773d7b360
+    # pip install git+git://github.com/schlegelp/pymaid@master
+
     NUMCODECS_ROOT=/src/numcodecs
     NUMCODECS_REPOSITORY=https://github.com/funkey/numcodecs
     NUMCODECS_REVISION=f950047d7b666723f81006cbdfd82c0e6705c39c
@@ -138,6 +141,7 @@ From: ubuntu:18.04
     pip install pymongo
     pip install neuroglancer
     pip install google-auth
+    pip install sklearn
 
 
 
