@@ -14,7 +14,7 @@ an issue or write us an email ([Julia
 Buhmann](mailto:buhmannj@janelia.hhmi.org) or [Jan
 Funke](mailto:funkej@janelia.hhmi.org)) if you have any questions!
 
-- [ ] Add train scripts
+- [x] Add train scripts
 - [ ] Add inference scripts
 - [ ] Add download links for pretrained models
 
@@ -40,11 +40,52 @@ cd synful
 pip install -r requirements.txt
 python setup.py install
 ```
+If you are interested in using the package for training and prediction, additionally add tensorflow and funlib.learn.tensorflow to your conda env:
+
+```bash
+pip install git+git://github.com/funkelab//funlib.learn.tensorflow@0712fee6b6c083c6bfc86e76f475b2e40b3c64f2
+conda install tensorflow-gpu=1.14 cudatoolkit=10.0
+```
+
 
 Training
 --------
 
-Train scripts will be added soon.
+Training scripts are found in
+
+```
+train/<setup>
+```
+
+where `<setup>` is the name of a particular network configuration.
+In such a <setup> directory, you will find two files:
+- `generate_network.py` (generates a tensorflow network based on the parameter.json file in the same directoy)
+- `train.py` (starts training)
+
+
+To get started, have a look at the train script in [train/setup01/train.py](train/setup01).
+
+To start training:
+```bash
+python generate_network.py parameter.json
+python train.py parameter.json
+```
+
+- setup01: parameter.json is set to train a network on post-synaptic sites (single-task network)
+- setup02: parameter.json is set to train on direction vectors (single-task network)
+- setup03: parameter.json is set to train on both post-synaptic sites and direction vectors (multi-task network)
+
+
+
+### Monitoring Training
+
+To visualize snapshots that are produced during training use this [script](scripts/visualization/visualize_snapshot.py):
+
+```
+python -i visualize_snapshot.py 300001 setup01
+```
+
+in order to load iteration `300001` of training setup `setup01` (use -1 to indicate most recent snapshot)
 
 
 Inference
