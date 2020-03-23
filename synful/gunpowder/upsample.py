@@ -55,6 +55,8 @@ class UpSample(BatchFilter):
         logger.debug("preparing downsampling of " + str(self.source))
 
         request_roi = request[self.target].roi
+        voxel_size = self.spec[self.source].voxel_size
+        request_roi = request_roi.snap_to_grid(voxel_size, mode='grow')
         logger.debug("request ROI is %s" % request_roi)
 
         # add or merge to batch request
@@ -78,18 +80,17 @@ class UpSample(BatchFilter):
 
         assert input_roi.contains(request_roi)
 
-        # # upsample
-        crop = batch.arrays[self.source].crop(request_roi)
+        # upsample
         order = 3 if batch.arrays[self.source].spec.interpolatable else 0
-        data = ndimage.zoom(crop.data, np.array(self.factor), order=order)
+        data = ndimage.zoom(batch.arrays[self.source].data, np.array(self.factor), order=order)
 
-        # create output array
+        # Create output array, crop accordingly.
         spec = self.spec[self.target].copy()
-        spec.roi = request_roi
-        batch.arrays[self.target] = Array(data, spec)
+        spec.roi = input_roi
+        ar = Array(data, spec)
+        batch.arrays[self.target] = ar.crop(request_roi)
 
         if self.source in request:
-
             # restore requested rois
             request_roi = request[self.source].roi
 
