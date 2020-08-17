@@ -53,8 +53,9 @@ python setup.py install
 If you are interested in using the package for training and prediction, additionally add tensorflow and funlib.learn.tensorflow to your conda env:
 
 ```bash
-pip install git+git://github.com/funkelab//funlib.learn.tensorflow@0712fee6b6c083c6bfc86e76f475b2e40b3c64f2
 conda install tensorflow-gpu=1.14 cudatoolkit=10.0
+pip install git+git://github.com/funkelab/funlib.learn.tensorflow@0712fee6b6c083c6bfc86e76f475b2e40b3c64f2
+
 ```
 
 #### Install time
