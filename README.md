@@ -27,8 +27,18 @@ The pipeline processes 3D raw data in two steps into synaptic partners:
 
 ![method_figure](docs/_static/method_overview.png)
 
-Installation
-------------
+
+System Requirements
+-------------------
+
+- Hardware requirements
+  - training and prediction requires at least one GPU with sufficient memory (12 GB)
+  - For instance, we mostly used `GeForce GTX TITAN X 12 GB` for our project
+- Software requirements
+  - Software has been tested on Linux (Ubuntu 16.04)
+
+Installation Guide
+------------------
 from source (creating a conda env is optional, but recommended).
 - Clone this repository.
 - In a terminal:
@@ -46,6 +56,9 @@ If you are interested in using the package for training and prediction, addition
 pip install git+git://github.com/funkelab//funlib.learn.tensorflow@0712fee6b6c083c6bfc86e76f475b2e40b3c64f2
 conda install tensorflow-gpu=1.14 cudatoolkit=10.0
 ```
+
+#### Install time
+Installation should take around 5 mins (including 3 mins for the tensorflow installation).
 
 
 Training
@@ -74,6 +87,9 @@ python train.py parameter.json
 - setup01: parameter.json is set to train a network on post-synaptic sites (single-task network)
 - setup02: parameter.json is set to train on direction vectors (single-task network)
 - setup03: parameter.json is set to train on both post-synaptic sites and direction vectors (multi-task network)
+
+#### Training runtime
+Training takes between 3 and 10 days (depending on the size of the network), but you should see reasonable results within a day (after 90k iterations).
 
 
 
