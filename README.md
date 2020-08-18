@@ -116,7 +116,7 @@ python predict_blockwise.py predict_template.json
 ```
 Adapt following parameters in the configfile <scripts/predict/predict_template.json>:
 - `db_host` --> Put here the name of your running mongodb server (this is used to track which chunks are processed)
-- `raw_file` --> Put here the filepath of your raw data (as an example you can use the CREMI data that you can download from www.cremi.org
+- `raw_file` --> Put here the filepath of your raw data (as an example you can use the CREMI data that you can download from www.cremi.org)
 
 For a full list of parameters and explanation, see: <scripts/predict/predict_blockwise.py>.
 
