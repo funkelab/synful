@@ -14,9 +14,6 @@ import pymongo
 logging.basicConfig(level=logging.INFO)
 
 
-# logging.getLogger('daisy.blocks').setLevel(logging.DEBUG)
-
-
 def predict_blockwise(
         experiment,
         setup,
@@ -272,7 +269,6 @@ def predict_worker(
             'queue': 'gpu_rtx',
             'num_cpus': 2,
             'num_cache_workers': 4,
-            'singularity': 'singularity_images/synful/synful_py3:v10.img'
         }
     else:
         with open(worker_config, 'r') as f:
@@ -313,37 +309,26 @@ def predict_worker(
 
     print("Running block with config %s..." % config_file)
 
-    command = run(
-        command='python -u %s %s' % (
-            predict_script,
-            config_file),
-        queue=worker_config['queue'],
-        num_cpus=worker_config['num_cpus'],
-        num_gpus=1,
-        # singularity_image=worker_config['singularity'],
-        mount_dirs=[
-            '/nrs',
-            '/groups'
-        ],
-        execute=False,
-        expand=False)
-
-    daisy.call(command, log_out=log_out, log_err=log_err)
-
+    # Commented out: Use this if you have a cluster available using lsf (--> command bsub).
+    # command = run(
+    #     command='python -u %s %s' % (
+    #         predict_script,
+    #         config_file),
+    #     queue=worker_config['queue'],
+    #     num_cpus=worker_config['num_cpus'],
+    #     num_gpus=1,
+    #     mount_dirs=[
+    #     ],
+    #     execute=False,
+    #     expand=False)
+    # daisy.call(command, log_out=log_out, log_err=log_err)
+    command = "python -u %s %s" % (predict_script, config_file)
+    os.system(command)
     logging.info('Predict worker finished')
-
-    # # if things went well, remove temporary files
-    # os.remove(config_file)
-    # os.remove(log_out)
-    # os.remove(log_err)
 
 
 def check_block(blocks_predicted, block):
-    # print("Checking if block %s is complete..." % block.write_roi)
-
     done = blocks_predicted.count({'block_id': block.block_id}) >= 1
-
-    # print("Block %s is %s" % (block, "done" if done else "NOT done"))
 
     return done
 
