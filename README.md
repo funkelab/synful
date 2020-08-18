@@ -15,7 +15,7 @@ Buhmann](mailto:buhmannj@janelia.hhmi.org) or [Jan
 Funke](mailto:funkej@janelia.hhmi.org)) if you have any questions!
 
 - [x] Add train scripts
-- [ ] Add inference scripts
+- [x] Add inference scripts
 - [ ] Add download links for pretrained models
 
 Method
@@ -108,4 +108,14 @@ in order to load iteration `300001` of training setup `setup01` (use -1 to indic
 Inference
 --------
 
-Inference scripts will be added soon.
+Once you trained a network, you can use this script to run inference:
+
+```
+cd scripts/predict/
+python predict_blockwise.py predict_cremi.json
+```
+Change the parameter in the configfile <predict/predict_cremi.json> accordingly (eg. indicate directory of where you would like to write your output etc.).
+
+#### Inference runtime
+
+Processing a CREMI cube (5 microns X 5 microns x 5 microns) takes ~4 minutes on a single GPU.
