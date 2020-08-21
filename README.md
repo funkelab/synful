@@ -16,7 +16,7 @@ Funke](mailto:funkej@janelia.hhmi.org)) if you have any questions!
 
 - [x] Add train scripts
 - [x] Add inference scripts
-- [ ] Add download links for pretrained models
+- [x] Add download links for pretrained models
 
 Method
 ------
@@ -124,3 +124,26 @@ For a full list of parameters and explanation, see: <scripts/predict/predict_blo
 #### Inference runtime
 
 Processing a CREMI cube (5 microns X 5 microns x 5 microns) takes ~4 minutes on a single GPU.
+
+Pretrained Models
+-----------------
+We provide pretrained models, that we discuss in detail in our [bioRxiv preprint](https://www.biorxiv.org/content/10.1101/2019.12.12.874172v2). You will find the results of our gridsearch and the parameters that we used in Figure 3 `Validation results on CREMI dataset`.
+
+We provide four models that you can download from [here](https://www.dropbox.com/s/301382766164ism/pretrained.zip?dl=0).
+
+Please extract the zip file into <scripts/train/> of this repository, this will add for each model a setup directory with the necassary config files, tensorflow checkpoint and predict script.
+
+For instance for `p_setup52` (marked orange in Figure 3, one of the best performing models), you will get all relevant files in <scripts/train/p_setup52>.
+To run inference, you have to change the setup parameter in the predict config file to `p_setup52` and proceed according to [inference section](#Inference).
+
+
+#### Details about the provided models
+
+|setup|specs|f-score with seg| f-score without|
+|---|---|---|---|
+|p_setup52 (+p_setup10)|big, curriculum, CE, ST|0.76|0.74|
+|p_setup51|big, curriculum, CE, MT_2|0.76|0.73|
+|p_setup54 (+p_setup05)|small, curriculum, MSE, ST|0.76|0.7|
+|p_setup45 (+p_setup05)|small, standard, MSE, MT2|0.73|0.68|
+Note, that for the models that have an underlying ST architecture we also indicate the setup for the corresponding direction-vector-models (p_setup05+p_setup10).
+If you want to use the model with highest accuracy, pick `p_setup52`; If you want to use a model that gives reasonnable results, but also has fast inference runtime, pick `p_setup54`.
