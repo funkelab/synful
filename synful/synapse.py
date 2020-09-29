@@ -151,7 +151,13 @@ def read_synapses_in_roi(directory, roi, chunk_size=None, score_thr=-1):
     """
 
     if chunk_size is None:
-        chunk_size = __get_chunk_size(directory)
+        attrfilename = os.path.join(directory, 'synfulattrs.json')
+        if os.path.exists(attrfilename):
+            with open(attrfilename) as f:
+                config = json.load(f)
+                chunk_size = config.get('chunk_size', None)
+        if chunk_size is None:
+            chunk_size = __get_chunk_size(directory)
     adjusted_roi = roi.snap_to_grid(chunk_size)
     blocks = __ndrange(adjusted_roi.get_begin(), adjusted_roi.get_end(),
                      chunk_size)
