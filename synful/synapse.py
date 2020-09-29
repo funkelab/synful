@@ -4,6 +4,7 @@ import logging
 import os
 from itertools import product, starmap
 import scipy
+import json
 
 import h5py
 import numpy as np
@@ -51,12 +52,20 @@ class Synapse(object):
 def create_synapses_from_db(synapses_dic):
     synapses = []
     for syn_dic in synapses_dic:
+        if 'post_z' in syn_dic:
+            post_loc = np.array(
+                (syn_dic['post_z'], syn_dic['post_y'], syn_dic['post_x']))
+        else:
+            post_loc = None
+        if 'pre_z' in syn_dic:
+            pre_loc = np.array(
+                (syn_dic['pre_z'], syn_dic['pre_y'], syn_dic['pre_x']))
+        else:
+            pre_loc = None
         syn = Synapse(
             id=syn_dic['id'],
-            location_pre=np.array(
-                (syn_dic['pre_z'], syn_dic['pre_y'], syn_dic['pre_x'])),
-            location_post=np.array(
-                (syn_dic['post_z'], syn_dic['post_y'], syn_dic['post_x'])),
+            location_pre=pre_loc,
+            location_post=post_loc,
         )
         syn.id_skel_pre = syn_dic.get('pre_skel_id', None)
         syn.id_skel_post = syn_dic.get('post_skel_id', None)
