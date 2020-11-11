@@ -7,16 +7,21 @@ import random
 
 import daisy
 import numpy as np
-from lsd import local_segmentation
 from pymongo import MongoClient
 from scipy.spatial import KDTree
 import sqlite3
 from funlib.math import cantor_number
 
-
 from . import database, synapse, evaluation
 
 logger = logging.getLogger(__name__)
+
+try:
+    from lsd import local_segmentation
+except ImportError:
+    local_segmentation = None
+    logger.warning('Could not import lsd, mapping using a local segmentation is not possible')
+
 
 def get_random_links(num_samples, cursor, table='synlinks', fast=False):
     cols = ['pre_x', 'pre_y', 'pre_z', 'post_x', 'post_y',
