@@ -84,6 +84,10 @@ class SynapseMapping(object):
             number of skeletons: num_skel_nodes_ignore or less. This is used
             to account for noisy/incorrectly placed skeleton nodes, which
             should be ignored during mapping.
+        multiprocess (``bool``): Whether to parallelize synapse mapping using
+            the python-package multiprocessing
+        mp_processes (``int``): Number of processes when multiprocess is set to
+            true.
         draw_random_from_sql (``str``): sql database, from which randomly
             synapses are drawn. If this is set, syn_db_name is not used, instead,
             synapse direction vectors are drawn at random from provided database.
@@ -103,7 +107,9 @@ class SynapseMapping(object):
                  gtsyn_db_col=None,
                  seg_agglomeration_json=None,
                  distance_upper_bound=None, num_skel_nodes_ignore=0,
-                 multiprocess=False, draw_random_from_sql=None, random_density=10):
+                 multiprocess=False, mp_processes=40,
+                 draw_random_from_sql=None,
+                 random_density=10):
         assert syndir is not None or syn_db_col is not None or draw_random_from_sql is not None, 'synapses have to be ' \
                                                          'provided either in syndir format or db format'
 
@@ -126,6 +132,7 @@ class SynapseMapping(object):
         self.distance_upper_bound = distance_upper_bound
         self.num_skel_nodes_ignore = num_skel_nodes_ignore
         self.multiprocess = multiprocess
+        self.mp_processes = mp_processes
         self.skel_df = pd.DataFrame()
         self.draw_random_from_sql = draw_random_from_sql
         self.random_density = random_density
@@ -225,6 +232,7 @@ class SynapseMapping(object):
         if self.draw_random_from_sql is not None:
             synapses = [syn for syn in synapses if syn.id_skel_pre != syn.id_skel_post]
         syn_db.write_synapses(synapses)
+        logger.info('wrote mapped synapses')
 
     def add_skel_ids_daisy(self, roi_core, roi_context, seg_thr,
                            seg_ids_ignore):
@@ -497,7 +505,7 @@ class SynapseMapping(object):
         ]})
         synapses = synapse.create_synapses_from_db(synapses)
 
-        logger.debug('found {} synapses '.format(len(synapses)))
+        logger.info('found {} synapses '.format(len(synapses)))
         logger.info('Overwriting {}/{}/{}'.format(self.output_db_name,
                                                   self.output_db_host,
                                                   self.output_db_col))
@@ -506,18 +514,15 @@ class SynapseMapping(object):
                                           db_col_name=self.output_db_col,
                                           mode='w')
         batch_size = 100
-        procs = []
+        args = []
         for ii in range(0, len(synapses), batch_size):
             if self.multiprocess:
-                proc = mp.Process(
-                    target=lambda: self.match_synapses_to_skeleton(
-                        synapses[ii:ii + batch_size])
-                )
-                procs.append(proc)
-                proc.start()
+                args.append(synapses[ii:ii + batch_size])
             else:
                 self.match_synapses_to_skeleton(synapses[ii:ii + batch_size])
 
         if self.multiprocess:
-            for proc in procs:
-                proc.join()
+            pool = mp.Pool(self.mp_processes)
+            pool.map(self.match_synapses_to_skeleton, args)
+            pool.close()
+            pool.join()
