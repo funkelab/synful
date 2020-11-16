@@ -1,9 +1,13 @@
 import unittest
+# import pytest
 import gunpowder as gp
 from synful.gunpowder import ExtractSynapses
 import numpy as np
 import synful
 import logging
+import os
+import tempfile
+import shutil
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('synful.gunpowder').setLevel(logging.INFO)
@@ -66,6 +70,7 @@ class TestSource(gp.BatchProvider):
 
 
 class TestExtractSynapses(unittest.TestCase):
+
     def test_output_basics(self):
         d_pred = gp.ArrayKeys.D_PRED
         m_pred = gp.ArrayKeys.M_PRED
@@ -84,11 +89,13 @@ class TestExtractSynapses(unittest.TestCase):
 
         d_predar = np.ones((3, shape[0], shape[1], shape[2])) * 10
 
+        outdir = tempfile.mkdtemp()
+
         pipeline = (
                 TestSource(m_predar, d_predar,
                            voxel_size=voxel_size) +
                 ExtractSynapses(
-                    m_pred, d_pred, presyn, postsyn, parameters, context=context
+                    m_pred, d_pred, presyn, postsyn, out_dir=outdir, settings=parameters, context=context
                 )
         )
 
@@ -100,24 +107,30 @@ class TestExtractSynapses(unittest.TestCase):
         request[postsyn] = gp.PointsSpec(roi=roi)
         with gp.build(pipeline):
             batch = pipeline.request_batch(request)
-        prepoints = batch[presyn].data
-        postpoints = batch[postsyn].data
-        print(postpoints)
-        self.assertTrue(len(prepoints) == 1)
-        self.assertEqual(prepoints[0].props['score'], 1.0)
+        print(outdir, "outdir")
+        synapsefile = os.path.join(outdir, "40", "40", "40.npz")
+        with np.load(synapsefile) as data:
+            data = dict(data)
+
+        self.assertTrue(len(data['ids']) == 1)
+        self.assertEqual(data['scores'][0],
+                         1.0)  # Size of the cube.
         for ii in range(len(voxel_size)):
-            self.assertEqual(prepoints[0].location[ii],
+            self.assertEqual(data['positions'][0][1][ii],
                              insidepoint[ii] * voxel_size[ii])
 
         for ii in range(len(voxel_size)):
-            self.assertEqual(postpoints[1].location[ii],
-                             insidepoint[ii] * voxel_size[ii]+10)
+            self.assertEqual(data['positions'][0][0][ii],
+                             insidepoint[ii] * voxel_size[ii] + 10)
+        shutil.rmtree(outdir)
 
     def test_context(self):
         d_pred = gp.ArrayKeys.D_PRED
         m_pred = gp.ArrayKeys.M_PRED
         presyn = gp.PointsKeys.PRESYN
         postsyn = gp.PointsKeys.POSTSYN
+
+        outdir = tempfile.mkdtemp()
 
         voxel_size = gp.Coordinate((10, 10, 10))
         size = ((200, 200, 200))
@@ -137,7 +150,7 @@ class TestExtractSynapses(unittest.TestCase):
                 TestSource(m_predar, d_predar,
                            voxel_size=voxel_size) +
                 ExtractSynapses(
-                    m_pred, d_pred, presyn, postsyn, parameters, context=context
+                    m_pred, d_pred, presyn, postsyn, out_dir=outdir, settings=parameters, context=context
                 ) +
                 gp.PrintProfilingStats()
         )
@@ -150,19 +163,22 @@ class TestExtractSynapses(unittest.TestCase):
         request[postsyn] = gp.PointsSpec(roi=roi)
         with gp.build(pipeline):
             batch = pipeline.request_batch(request)
-        prepoints = batch[presyn].data
-        postpoints = batch[postsyn].data
-        print(prepoints)
-        self.assertTrue(len(prepoints) == 1)
-        self.assertEqual(prepoints[0].props['score'],
+
+        synapsefile = os.path.join(outdir, "40", "40", "40.npz")
+        with np.load(synapsefile) as data:
+            data = dict(data)
+
+        self.assertTrue(len(data['ids']) == 1)
+        self.assertEqual(data['scores'][0],
                          2.0 ** 3)  # Size of the cube.
         for ii in range(len(voxel_size)):
-            self.assertEqual(prepoints[0].location[ii],
+            self.assertEqual(data['positions'][0][0][ii],
                              borderpoint[ii] * voxel_size[ii])
 
         for ii in range(len(voxel_size)):
-            self.assertEqual(postpoints[1].location[ii],
+            self.assertEqual(data['positions'][0][1][ii],
                              borderpoint[ii] * voxel_size[ii] + 0)
+        shutil.rmtree(outdir)
 
 
 if __name__ == '__main__':
