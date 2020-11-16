@@ -1,13 +1,13 @@
-import unittest
-# import pytest
-import gunpowder as gp
-from synful.gunpowder import ExtractSynapses
-import numpy as np
-import synful
 import logging
 import os
-import tempfile
 import shutil
+import tempfile
+import unittest
+
+import gunpowder as gp
+import numpy as np
+import synful
+from synful.gunpowder import ExtractSynapses
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('synful.gunpowder').setLevel(logging.INFO)
