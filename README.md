@@ -89,9 +89,33 @@ python train.py parameter.json
 - setup02: parameter.json is set to train on direction vectors (single-task network)
 - setup03: parameter.json is set to train on both post-synaptic sites and direction vectors (multi-task network)
 
+#### Details on hyperparameters
+When training a network, you can set following hyperparameters in `scripts/train/<setup01/02/03>/parameter.json`
+
+Parameters to set the architecture of the network (also see [doc](https://github.com/funkelab/funlib.learn.tensorflow/blob/master/funlib/learn/tensorflow/models/unet.py#L506) where we create the U-Net)
+- `input_size`: the dimensions of the cube that is used as input (called a mini-batch)
+- `downsample_factor` = [[1, 3, 3], [1, 3, 3], [3, 3, 3]] creates a U-Net with four resolution levels
+    - the first one being the original resolution, the second one with downsampled feature maps with factos [1, 3, 3] etc.
+- `fmap_num`: Number of feature maps in the first layer (we used 4 in the paper)
+- `fmap_inc_factor`: In each layer, we use `fmap_inc_factor` to increase our number of feature maps (we used 5 and 12 in the paper)
+    - Eg. if we have `fmap_num = 4` and `fmap_inc_factor = 5` , we have 20 in our first layer, 100 in our second layer ...
+- `unet_model`: vanilla, or dh_unet; vanille=single-task network, dh_unet=multitask network with two different upsampling paths
+
+Training parameters
+- `learning_rate`: we used the AdamOptimizer across all experiments, with beta1=0.95,beta2=0.999,epsilon=1e-8
+
+ST / MT parameters
+- `loss_comb_type`: in a multi-task setting, how to combine the two different losses
+- `m_loss_scale` : loss weight for post-synaptic mask
+- `d_loss_scale` : loss weight for direction vector field
+
+Balancing parameters needed to account for sparsity of synaptic sites
+- `reject_probability` : 0.95 - p_rej in paper --> reject empty mini-batches with probability `reject_probability`
+- `clip_range` : the loss is scaled with the inverse class frequency ratio of foreground-and background voxels, clipping at `clip_range`
+
+
 #### Training runtime
 Training takes between 3 and 10 days (depending on the size of the network), but you should see reasonable results within a day (after 90k iterations).
-
 
 
 ### Monitoring Training
