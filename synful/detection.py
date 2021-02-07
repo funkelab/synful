@@ -62,6 +62,12 @@ class SynapseExtractionParameters(object):
         self.score_thr = score_thr
         self.nms_radius = nms_radius if extract_type == 'nms' else None
 
+    def __repr__(self):
+        return ('<' + ', '.join(
+            [attr+': {}'.format(self.__getattribute__(attr))
+             for attr in dir(self) if not attr.startswith('_')])
+            + '>')
+
 
 def __from_labels_to_edt(labels, voxel_size):
     boundaries = __find_boundaries(labels)
