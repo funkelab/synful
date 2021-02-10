@@ -36,7 +36,8 @@ class SynapseExtractionParameters(object):
 
         score_type (``string``, optional):
 
-            How to calculate the score. Possible options: sum, mean, max, count.
+            How to calculate the score.
+            Possible options: sum, mean, max, count, all.
 
 
     '''
@@ -185,6 +186,9 @@ def __from_labels_to_locs(labels, regions, voxel_size,
                 score = score_crop.max()
             elif score_type == 'count':
                 score = reg['area']
+            elif score_type == 'all':
+                score = (score_crop.sum(), score_crop.mean(),
+                         score_crop.max(), reg['area'])
             else:
                 raise RuntimeError('score not defined')
             scores.append(score)
