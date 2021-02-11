@@ -3,7 +3,7 @@ pymongo
 zarr
 sklearn
 pandas
-pymaid
+python-catmaid
 neuroglancer==1.1.2
 cloud-volume
 git+git://github.com/funkelab/daisy@0d5d38a17d7250979284ace369bd71b89d004c97#egg=daisy
