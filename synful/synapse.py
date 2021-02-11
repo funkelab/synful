@@ -14,9 +14,9 @@ import neuroglancer
 logger = logging.getLogger(__name__)
 
 try:
-    import pymaid
+    import navis
 except ImportError:
-    logger.warning('Could not import pymaid, functions with CATMAID skeletons '
+    logger.warning('Could not import navis, functions with CATMAID skeletons '
                    'will not work')
 
 
@@ -263,7 +263,7 @@ def __find_cc_of_synapses(synapses, dist_threshold, skeleton=None):
         dists = np.zeros((len(synapses), len(synapses)))
         for i, node_a in enumerate(tree_node_ids):
             for j, node_b in enumerate(tree_node_ids):
-                dist = pymaid.graph_utils.dist_between(skeleton, node_a, node_b)
+                dist = navis.graph_utils.dist_between(skeleton, node_a, node_b)
                 dists[i,j] = dist if dist != 0 else -1
 
     # it is a symmetric matrix, remove redundancy
