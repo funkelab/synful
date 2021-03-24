@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/166422086.svg)](https://zenodo.org/badge/latestdoi/166422086)
+
 Synful
 ======
 Overview
