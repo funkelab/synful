@@ -151,7 +151,7 @@ For a full list of parameters and explanation, see: <scripts/predict/predict_blo
 
 Processing a CREMI cube (5 microns X 5 microns x 5 microns) takes ~4 minutes on a single GPU.
 
-Pretrained Models
+Pretrained Models / Original Setup
 -----------------
 We provide pretrained models, that we discuss in detail in our [bioRxiv preprint](https://www.biorxiv.org/content/10.1101/2019.12.12.874172v2). You will find the results of our gridsearch and the parameters that we used in Figure 3 `Validation results on CREMI dataset`.
 
@@ -174,3 +174,9 @@ To run inference, you have to change the setup parameter in the predict config f
 
 Note, that for the models that have an underlying ST architecture we also indicate the setup for the corresponding direction-vector-models (p_setup05+p_setup10).
 If you want to use the model with highest accuracy, pick `p_setup52`; If you want to use a model that gives reasonnable results, but also has fast inference runtime, pick `p_setup54`.
+
+#### Details about experiments that were done to produce above models
+- dataset: As noted in the paper, we used a realigend version of the original CREMI datasets for training. You can download the data from [here](https://www.dropbox.com/s/i858mrs6s0rj0rt/groundtruth.tar.gz?dl=0) (cremi_v01 is the correct folder).
+This data also contains the masks that were used to cover training/validation region in the data. (Note: It is a bit more annoying to work with this realigned data, as the mask is not cube/cuboid-shaped.)
+- here is the original code for training, evaluation and inference: https://zenodo.org/record/4635362#.YmufZBxBzCI
+- original gridsearch was carried out using luigi (https://luigi.readthedocs.io/en/stable/index.html)
